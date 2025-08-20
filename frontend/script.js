@@ -28,14 +28,21 @@ form.addEventListener('submit', async (e) =>{
       body: JSON.stringify({ question: q })
     });
 
-    // Try to parse JSON; if response isn't JSON (e.g. HTML error page),
-    // fall back to text so we can show a helpful error message instead of a parse exception.
+    // Parse JSON when possible. If parsing fails, clone the response and
+    // read the text from the clone so we don't attempt to read the same
+    // body stream twice (which causes "body stream already read").
     let data;
     try {
       data = await res.json();
     } catch (parseErr) {
-      const text = await res.text();
-      throw new Error(text || parseErr.message);
+      try {
+        const clone = res.clone();
+        const text = await clone.text();
+        throw new Error(text || parseErr.message);
+      } catch (inner) {
+        // If cloning/reading also fails, throw the original parse error message
+        throw new Error(parseErr.message || 'Response parse error');
+      }
     }
     // remove the last '...' message
     const last = messages.querySelector('.message.bot:last-child');

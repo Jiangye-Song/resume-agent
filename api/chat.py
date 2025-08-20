@@ -45,3 +45,11 @@ async def chat(request: Request):
         print(f"[chat][{log_id}] exception: {str(exc)}\n{tb}")
         # Return JSON with error detail and log_id to help debugging in Vercel logs
         return JSONResponse({'error': str(exc), 'log_id': log_id})
+
+
+@app.get('/')
+async def health(request: Request):
+    """Simple health check so GET /api/chat returns JSON instead of HTML 404."""
+    log_id = str(int(time.time() * 1000))
+    print(f"[chat][health] log_id={log_id} ping")
+    return JSONResponse({'status': 'ok', 'log_id': log_id})
