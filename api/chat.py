@@ -61,3 +61,10 @@ async def health_catch(request: Request, path_name: str):
     log_id = str(int(time.time() * 1000))
     print(f"[chat][health] catch log_id={log_id} path={path_name}")
     return JSONResponse({'status': 'ok', 'log_id': log_id, 'path': path_name})
+
+
+@app.post('/{path_name:path}')
+async def chat_post_catch(request: Request, path_name: str):
+    """Catch-all POST so requests forwarded as /api/chat or /api/chat/anything still invoke the chat handler."""
+    # Reuse the main chat handler which expects a Request
+    return await chat(request)

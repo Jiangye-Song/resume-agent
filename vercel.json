@@ -5,9 +5,9 @@
 		{ "src": "frontend/**", "use": "@vercel/static" }
 	],
 		"routes": [
-    { "src": "/api/chat", "dest": "/api/chat.py" },
-    { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/", "dest": "/frontend/index.html" },
-    { "src": "(.*)", "dest": "/frontend/$1" }
+	{ "src": "/api/chat", "dest": "/api/chat.py" },
+	{ "src": "/api/(.*)", "dest": "/api/$1" },
+	{ "src": "^/$", "dest": "/frontend/index.html" },
+	{ "src": "^/(.*)$", "dest": "/frontend/$1" }
   ]
 }

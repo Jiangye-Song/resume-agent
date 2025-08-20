@@ -17,3 +17,11 @@ async def hello_catch(path_name: str):
     log_id = str(int(time.time() * 1000))
     print(f"[hello] catch log_id={log_id} path={path_name}")
     return JSONResponse({'status': 'ok', 'log_id': log_id, 'path': path_name})
+
+
+@app.post('/{path_name:path}')
+async def hello_post_catch(path_name: str):
+    # Simple POST echo to confirm POSTs reach the function
+    log_id = str(int(time.time() * 1000))
+    print(f"[hello] POST catch log_id={log_id} path={path_name}")
+    return JSONResponse({'status': 'ok', 'log_id': log_id, 'path': path_name})
