@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>RAG Chat</title>
+  <title>Virtual Jiangye</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="chat-container">
     <header>
-      <h1>RAG Chat</h1>
+      <h1>Talk to virtual Jiangye!</h1>
     </header>
 
     <div id="messages" class="messages"></div>
@@ -20,6 +20,9 @@
     </form>
   </div>
 
+  <!-- Markdown renderer (marked) and sanitizer (DOMPurify) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@2.4.0/dist/purify.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

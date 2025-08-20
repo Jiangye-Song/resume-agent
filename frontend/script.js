@@ -14,7 +14,18 @@ function appendMessage(text, from='bot'){
   }
 
   const displayed = from === 'bot' ? hideThink(text) : text;
-  bubble.textContent = displayed;
+  if(from === 'bot'){
+    // Render markdown -> HTML and sanitize it to avoid XSS
+    try{
+      const rawHtml = marked.parse(displayed || '');
+      const clean = DOMPurify.sanitize(rawHtml);
+      bubble.innerHTML = clean;
+    }catch(e){
+      bubble.textContent = displayed;
+    }
+  }else{
+    bubble.textContent = displayed;
+  }
   wrapper.appendChild(bubble);
   messages.appendChild(wrapper);
   messages.scrollTop = messages.scrollHeight;
