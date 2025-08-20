@@ -53,3 +53,11 @@ async def health(request: Request):
     log_id = str(int(time.time() * 1000))
     print(f"[chat][health] log_id={log_id} ping")
     return JSONResponse({'status': 'ok', 'log_id': log_id})
+
+
+@app.get('/{path_name:path}')
+async def health_catch(request: Request, path_name: str):
+    """Catch-all GET so requests forwarded as /api/chat or /api/chat/anything still return JSON."""
+    log_id = str(int(time.time() * 1000))
+    print(f"[chat][health] catch log_id={log_id} path={path_name}")
+    return JSONResponse({'status': 'ok', 'log_id': log_id, 'path': path_name})
