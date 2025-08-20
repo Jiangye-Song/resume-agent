@@ -3,6 +3,8 @@ from fastapi.responses import JSONResponse
 import os
 import asyncio
 from dotenv import load_dotenv
+import traceback
+import time
 
 load_dotenv()
 
@@ -22,17 +24,24 @@ async def chat(request: Request):
     if request.headers.get('content-type', '').startswith('application/json'):
         body = await request.json()
 
+    # Simple correlation id for logs
+    log_id = str(int(time.time() * 1000))
+    print(f"[chat] log_id={log_id} request_body={body}")
+
     question = body.get('question') if isinstance(body, dict) else None
     if not question:
         return JSONResponse({'error': 'question is required'})
 
     if rag_query is None:
         # Return JSON with error so frontend can parse it
-        return JSONResponse({'error': f'RAG backend not available: {_import_error}'})
+        print(f"[chat][{log_id}] rag backend not available: {_import_error}")
+        return JSONResponse({'error': f'RAG backend not available: {_import_error}', 'log_id': log_id})
 
     try:
         answer = await rag_query(question)
         return JSONResponse({'answer': answer})
     except Exception as exc:
-        # Return JSON with error detail to avoid HTML error pages
-        return JSONResponse({'error': str(exc)})
+        tb = traceback.format_exc()
+        print(f"[chat][{log_id}] exception: {str(exc)}\n{tb}")
+        # Return JSON with error detail and log_id to help debugging in Vercel logs
+        return JSONResponse({'error': str(exc), 'log_id': log_id})

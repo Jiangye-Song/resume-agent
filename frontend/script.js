@@ -27,7 +27,16 @@ form.addEventListener('submit', async (e) =>{
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question: q })
     });
-    const data = await res.json();
+
+    // Try to parse JSON; if response isn't JSON (e.g. HTML error page),
+    // fall back to text so we can show a helpful error message instead of a parse exception.
+    let data;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      const text = await res.text();
+      throw new Error(text || parseErr.message);
+    }
     // remove the last '...' message
     const last = messages.querySelector('.message.bot:last-child');
     if(last) last.remove();
