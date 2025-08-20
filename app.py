@@ -35,54 +35,7 @@ except Exception as e:
 
 
 
-# Background migration control
-migration_status = {
-    'running': False,
-    'last_error': None,
-}
-
-
-def start_migration_in_background():
-    import threading
-
-    def runner():
-        migration_status['running'] = True
-        migration_status['last_error'] = None
-        try:
-            asyncio.run(migrate_data())
-            print('Background migration completed')
-        except Exception as e:
-            migration_status['last_error'] = str(e)
-            print('Background migration failed:', e)
-        finally:
-            migration_status['running'] = False
-
-    t = threading.Thread(target=runner, daemon=True)
-    t.start()
-
-
-    @app.route('/api/upsert-projects', methods=['POST'])
-    def api_upsert_projects():
-        """Trigger a background upsert of projects into Upstash Vector.
-
-        Optional protection: set MIGRATION_KEY in .env and provide JSON {"key": "..."}.
-        """
-        key_required = os.getenv('MIGRATION_KEY')
-        if key_required:
-            data = request.get_json() or {}
-            if data.get('key') != key_required:
-                return jsonify({'error': 'invalid key'}), 403
-
-        if migration_status['running']:
-            return jsonify({'status': 'already_running'}), 200
-
-        start_migration_in_background()
-        return jsonify({'status': 'started'}), 202
-
-
-    @app.route('/api/migration-status', methods=['GET'])
-    def api_migration_status():
-        return jsonify(migration_status)
+# Migration endpoints removed: use serverless endpoint at api/upsert-projects.py
 
 
 @app.route('/')

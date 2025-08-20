@@ -144,3 +144,44 @@ Made by Callum using:
 * [mxbai-embed-large](https://ollama.com/library/mxbai-embed-large)
 * Indian food inspiration 🍛
 
+---
+
+## 手动触发 Upsert（GitHub Actions）与本地运行说明
+
+你可以通过两种方式把 `projects` 表的数据上载到 Upstash Vector（或重新执行 upsert）：
+
+1) 在 GitHub 上手动触发（推荐，用于远端 agent / CI）
+
+- 仓库已包含一个手动触发的 Actions workflow：`.github/workflows/upsert.yml`。
+- 在使用之前，请在仓库 Settings → Secrets 中添加下列 secrets：
+  - `DATABASE_URL`（Neon/Postgres 连接字符串）
+  - `UPSTASH_VECTOR_REST_URL`
+  - `UPSTASH_VECTOR_REST_TOKEN`
+  - 可选：`GROQ_API_KEY`（如果迁移逻辑需要调用 LLM）
+  - 可选：`MIGRATION_KEY`（如果你在 serverless endpoint 中启用了密钥校验）
+
+- 在 GitHub 仓库页面，进入 Actions → 选择 “Upsert Projects to Vector” workflow → 点击 `Run workflow` 即可手动运行。
+
+2) 在本地手动运行（备用或调试用）
+
+- 在本地环境中，请确保安装依赖并把必要的环境变量加入你的 shell（或放入 `.env` 文件）。例如在 PowerShell 中：
+
+```powershell
+python -m pip install -r requirements.txt
+$env:DATABASE_URL = "your_database_url"
+$env:UPSTASH_VECTOR_REST_URL = "https://..."
+$env:UPSTASH_VECTOR_REST_TOKEN = "xxxxx"
+# 可选
+$env:GROQ_API_KEY = "xxxxx"
+python upsert_projects_to_vector.py
+```
+
+- 脚本 `upsert_projects_to_vector.py` 会调用仓库中的迁移工具（`migrate_utils.py`），并在控制台输出上载统计（例如：总条目、已 upsert 数量、错误数）。
+
+小提示：如果你想先预览将要 upsert 的内容（dry-run），我可以为 `upsert_projects_to_vector.py` 添加一个 `--dry-run` 选项，打印出 enriched_text 和 metadata，而不实际调用 Upstash。
+
+---
+
+如果你需要我同时把 `--dry-run` 选项添加到 upsert 脚本，或把 workflow 改成可以选择只 upsert 指定 project id 的形式，告诉我你想要的参数，我会继续实现.
+````
+

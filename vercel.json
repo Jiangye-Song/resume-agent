@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "api/upsert-projects.py", "use": "@vercel/python" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/",
+      "dest": "/frontend/index.html" },
+    { "src": "(.*)", "dest": "/frontend/$1" }
+  ]
+}

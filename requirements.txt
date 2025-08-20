@@ -4,3 +4,5 @@ python-dotenv
 requests
 Flask
 asyncpg
+fastapi
+uvicorn
