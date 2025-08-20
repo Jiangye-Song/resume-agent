@@ -5,11 +5,15 @@ from groq import Groq
 import asyncio
 from dotenv import load_dotenv
 
+try:
+    import asyncpg
+except Exception:
+    asyncpg = None
+
 # Load environment variables
 load_dotenv()
 
 # Constants
-JSON_FILE = "foods.json"
 VECTOR_DB_TYPE = os.getenv("VECTOR_DB_TYPE")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER")
 LLM_MODEL = os.getenv("GROQ_MODEL", "deepseek-r1-distill-llama-70b")
@@ -45,9 +49,57 @@ if LLM_PROVIDER != "groq":
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-# Load data
-with open(JSON_FILE, "r", encoding="utf-8") as f:
-    food_data = json.load(f)
+async def load_projects_from_db():
+    """Load projects data from Postgres if DATABASE_URL is set. Returns a list of dicts from projects table."""
+    DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
+    if not DATABASE_URL:
+        return None
+    if asyncpg is None:
+        raise RuntimeError('asyncpg not installed; cannot load projects from Postgres')
+
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        rows = await conn.fetch('SELECT data FROM projects ORDER BY id')
+        items = []
+        for r in rows:
+            try:
+                d = r['data']
+                if isinstance(d, str):
+                    d = json.loads(d)
+                items.append(d)
+            except Exception:
+                continue
+        return items
+    finally:
+        await conn.close()
+
+
+async def load_projects_from_db():
+    """Load projects data from Postgres if DATABASE_URL is set. Returns a list of dicts from projects table."""
+    DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
+    if not DATABASE_URL:
+        return None
+    if asyncpg is None:
+        raise RuntimeError('asyncpg not installed; cannot load projects from Postgres')
+
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        rows = await conn.fetch('SELECT data FROM projects ORDER BY id')
+        items = []
+        for r in rows:
+            try:
+                d = r['data']
+                if isinstance(d, str):
+                    d = json.loads(d)
+                # Mark source so migrate_data can format it correctly
+                if isinstance(d, dict):
+                    d['_source'] = 'project'
+                items.append(d)
+            except Exception:
+                continue
+        return items
+    finally:
+        await conn.close()
 
 async def get_embedding(text):
     """Get embedding using Upstash's API with MXBAI_EMBED_LARGE_V1 model"""
@@ -65,36 +117,48 @@ async def migrate_data():
     """Migrate data from local JSON to Upstash Vector"""
     print("🔄 Starting migration to Upstash Vector...")
     
-    # Add all items (Upstash will handle duplicates)
-    new_items = food_data
+    # Load projects only (no foods or JSON fallback)
+    project_items = None
+    try:
+        project_items = await load_projects_from_db()
+    except Exception as e:
+        print('Warning: failed to load projects from DB:', e)
 
+    if not project_items:
+        print('No projects found in DB to migrate. Aborting migration.')
+        return
 
-    if new_items:
-        print(f"🆕 Adding {len(new_items)} new documents to Upstash Vector...")
-        index = Index(
-            url=UPSTASH_VECTOR_REST_URL,
-            token=UPSTASH_VECTOR_REST_TOKEN,
-        )
-        for item in new_items:
+    print(f"🆕 Adding {len(project_items)} project documents to Upstash Vector...")
+    index = Index(
+        url=UPSTASH_VECTOR_REST_URL,
+        token=UPSTASH_VECTOR_REST_TOKEN,
+    )
+    for item in project_items:
+        try:
+            title = item.get('title') or item.get('text') or 'Untitled Project'
+            summary = item.get('summary') or item.get('text', '')
+            enriched_text = f"{title}. {summary}"
+            metadata = {
+                'title': title,
+                'summary': summary,
+                'tags': item.get('tags', []),
+                'url': item.get('url', ''),
+                'source': 'project',
+                'data': item,
+            }
+            pid = f"project:{item.get('id') or title}"
+
+            await asyncio.to_thread(index.upsert, [
+                (str(pid), enriched_text, metadata)
+            ])
+        except Exception as e:
             try:
-                enriched_text = item["text"]
-                if "region" in item:
-                    enriched_text += f" This food is popular in {item['region']}."
-                if "type" in item:
-                    enriched_text += f" It is a type of {item['type']}."
-                await asyncio.to_thread(index.upsert, [
-                    (str(item["id"]), enriched_text, {
-                        "text": item["text"],
-                        "region": item.get("region", ""),
-                        "type": item.get("type", "")
-                    })
-                ])
-            except Exception as e:
-                print(f"Error adding item {item['id']}: {str(e)}")
-                continue
-        print("✅ Migration completed!")
-    else:
-        print("✅ All documents already in Upstash Vector.")
+                ident = item.get('id') if isinstance(item, dict) else str(item)
+            except Exception:
+                ident = '<unknown>'
+            print(f"Error adding project {ident}: {str(e)}")
+            continue
+    print("✅ Migration completed!")
 
 async def get_completion(prompt):
     """Get completion from Groq"""

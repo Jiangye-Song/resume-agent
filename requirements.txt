@@ -2,3 +2,5 @@ upstash-vector
 groq
 python-dotenv
 requests
+Flask
+asyncpg
