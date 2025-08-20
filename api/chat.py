@@ -24,14 +24,15 @@ async def chat(request: Request):
 
     question = body.get('question') if isinstance(body, dict) else None
     if not question:
-        raise HTTPException(status_code=400, detail='question is required')
+        return JSONResponse({'error': 'question is required'})
 
     if rag_query is None:
-        # Provide helpful error so frontend can show a friendly message
-        raise HTTPException(status_code=500, detail=f'RAG backend not available: {_import_error}')
+        # Return JSON with error so frontend can parse it
+        return JSONResponse({'error': f'RAG backend not available: {_import_error}'})
 
     try:
         answer = await rag_query(question)
         return JSONResponse({'answer': answer})
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        # Return JSON with error detail to avoid HTML error pages
+        return JSONResponse({'error': str(exc)})
