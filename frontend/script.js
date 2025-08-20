@@ -7,7 +7,14 @@ function appendMessage(text, from='bot'){
   wrapper.className = 'message ' + (from === 'user' ? 'user' : 'bot');
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
-  bubble.textContent = text;
+  // Hide any internal thinking/debug sections wrapped in <think>...</think>
+  function hideThink(s){
+    if(!s || typeof s !== 'string') return s;
+    return s.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  }
+
+  const displayed = from === 'bot' ? hideThink(text) : text;
+  bubble.textContent = displayed;
   wrapper.appendChild(bubble);
   messages.appendChild(wrapper);
   messages.scrollTop = messages.scrollHeight;
