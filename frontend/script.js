@@ -37,7 +37,7 @@ form.addEventListener('submit', async (e) =>{
   if(!q) return;
   appendMessage(q, 'user');
   input.value = '';
-  appendMessage('...', 'bot');
+  appendMessage('_Virtual Jiangye is typing a message..._', 'bot');
 
   try{
     const res = await fetch('/api/chat', {

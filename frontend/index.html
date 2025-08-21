@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Virtual Jiangye</title>
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
   <div class="chat-container">
     <header>
@@ -16,7 +18,12 @@
 
     <form id="chat-form" class="input-area">
       <input id="question" type="text" placeholder="Ask something..." autocomplete="off" />
-      <button type="submit">Send</button>
+      <button type="submit">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="-2 -2 24 24" aria-label="Send">
+          <title>Send</title>
+          <path fill="white" d="M2 21l21-9L2 3v7l15 2-15 2z" />
+        </svg>
+      </button>
     </form>
   </div>
 
@@ -25,4 +32,5 @@
   <script src="https://cdn.jsdelivr.net/npm/dompurify@2.4.0/dist/purify.min.js"></script>
   <script src="script.js"></script>
 </body>
+
 </html>
