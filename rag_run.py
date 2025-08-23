@@ -13,12 +13,13 @@ except Exception:
 # Load environment variables
 load_dotenv()
 
-# System prompt for the assistant; can be overridden with SYSTEM_PROMPT env var
-SYSTEM_PROMPT = os.getenv('SYSTEM_PROMPT') or '''You are a virtual assistant representing Jiangye, a job seeker actively looking for software engineering opportunities. Jiangye was an international student with bachelor degree of Computer Science in Monash University, and master degree of Information technology in UNSW, currently have full working rights. Your primary goal is to help recruiters, hiring managers, or collaborators understand Jiangye's background, technical skills, and project experience.
+# Cache for system prompt to avoid DB hits on every request
+_system_prompt_cache = None
+_cache_timestamp = 0
+CACHE_TTL = 300  # 5 minutes cache
 
-You are knowledgeable about Jiangye	s past projects stored in a vector database. If a project	s `end_date` is missing, treat it as an ongoing project (i.e., still active). When asked about projects, technologies, or experience, refer to available data and answer clearly and concisely.
-
-You should sound professional, friendly, and confident, like Jiangye himself presenting his work.'''
+# Default system prompt fallback
+DEFAULT_SYSTEM_PROMPT = '''You are a helpful assistant, you should notify the developer to set the system prompt.'''
 
 # Constants
 VECTOR_DB_TYPE = os.getenv("VECTOR_DB_TYPE")
@@ -55,6 +56,89 @@ if LLM_PROVIDER != "groq":
     raise ValueError("Only Groq is supported in this version")
 
 groq_client = Groq(api_key=GROQ_API_KEY)
+
+async def ensure_config_table():
+    """Ensure config table exists and has default system prompt on startup."""
+    DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
+    if not DATABASE_URL or asyncpg is None:
+        print("⚠️  Database not available, using default system prompt")
+        return
+    
+    try:
+        conn = await asyncpg.connect(DATABASE_URL)
+        try:
+            # Create config table if it doesn't exist
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            ''')
+            
+            # Check if system_prompt exists
+            row = await conn.fetchrow("SELECT value FROM config WHERE key = 'system_prompt'")
+            if not row:
+                # Insert default system prompt
+                await conn.execute('''
+                    INSERT INTO config (key, value, updated_at) 
+                    VALUES ('system_prompt', $1, NOW())
+                ''', DEFAULT_SYSTEM_PROMPT)
+                print("✅ Created config table and set default system prompt")
+            else:
+                print("✅ Config table exists with system prompt")
+                
+        finally:
+            await conn.close()
+    except Exception as e:
+        print(f"⚠️  Failed to initialize config table: {e}, using default system prompt")
+
+async def clear_system_prompt_cache():
+    """Clear the system prompt cache to force reload from database on next request."""
+    global _system_prompt_cache, _cache_timestamp
+    _system_prompt_cache = None
+    _cache_timestamp = 0
+
+async def load_system_prompt_from_db():
+    """Load system prompt from database with caching. Returns current system prompt."""
+    global _system_prompt_cache, _cache_timestamp
+    import time
+    
+    # Check cache first
+    current_time = time.time()
+    if _system_prompt_cache and (current_time - _cache_timestamp) < CACHE_TTL:
+        return _system_prompt_cache
+    
+    # Try database
+    DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
+    if not DATABASE_URL or asyncpg is None:
+        return DEFAULT_SYSTEM_PROMPT
+    
+    try:
+        conn = await asyncpg.connect(DATABASE_URL)
+        try:
+            # Try to get system prompt from a config table or projects table
+            try:
+                row = await conn.fetchrow(
+                    "SELECT value FROM config WHERE key = 'system_prompt' ORDER BY updated_at DESC LIMIT 1"
+                )
+                if row and row['value']:
+                    prompt = row['value']
+                    _system_prompt_cache = prompt
+                    _cache_timestamp = current_time
+                    return prompt
+            except:
+                return DEFAULT_SYSTEM_PROMPT
+                
+        finally:
+            await conn.close()
+    except Exception as e:
+        print(f"Warning: failed to load system prompt from DB: {e}")
+    
+    # Fallback to default
+    _system_prompt_cache = DEFAULT_SYSTEM_PROMPT
+    _cache_timestamp = current_time
+    return DEFAULT_SYSTEM_PROMPT
 
 async def load_projects_from_db():
     """Load projects data from Postgres if DATABASE_URL is set. Returns a list of dicts from projects table."""
@@ -170,13 +254,16 @@ async def migrate_data():
 async def get_completion(prompt):
     """Get completion from Groq"""
     try:
+        # Load system prompt dynamically from database
+        system_prompt = await load_system_prompt_from_db()
+        print("SYSTEM_PROMPT: ", system_prompt)
         # groq.Client returns a synchronous object; run it in a thread
         def sync_call():
-            # Include a system prompt to orient the assistant and an optional env override
+            # Include a system prompt to orient the assistant
             return groq_client.chat.completions.create(
                 model=LLM_MODEL,  # Using model from environment variable
                 messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.7,
@@ -196,6 +283,11 @@ async def get_completion(prompt):
 
 async def rag_query(question):
     """RAG query using Upstash Vector and Groq"""
+    # Ensure config table exists on first call
+    global _system_prompt_cache
+    if _system_prompt_cache is None:
+        await ensure_config_table()
+    
     try:
         # Step 1: Query the vector DB with raw text
         index = Index(

@@ -75,7 +75,7 @@ async def migrate_projects_async():
                 'title': title,
                 'summary': summary,
                 'tags': item.get('tags', []) if isinstance(item, dict) else [],
-                'url': item.get('url', '') if isinstance(item, dict) else '',
+                'project-detail-url': item.get('url', '') if isinstance(item, dict) else '',
                 'source': 'project',
                 # store raw data but be cautious about size; this is optional
                 'data': item if isinstance(item, dict) else {'text': str(item)}
