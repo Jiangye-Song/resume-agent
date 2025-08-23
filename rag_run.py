@@ -270,7 +270,24 @@ async def get_completion(prompt):
             return response.get("choices", [])[0].get("message", {}).get("content")
         return str(response)
     except Exception as e:
-        print(f"Error getting completion: {str(e)}")
+        error_str = str(e)
+        print(f"Error getting completion: {error_str}")
+        
+        # 检测速率限制错误并提取等待时间
+        if "rate_limit_reached" in error_str or "Rate limit reached" in error_str:
+            # 尝试提取等待时间
+            import re
+            time_match = re.search(r'Please try again in ([\d\.]+[ms]?[\d\.]*[sm])', error_str)
+            if time_match:
+                wait_time = time_match.group(1)
+                print(f"\n⚠️  API速率限制提醒 ⚠️")
+                print(f"📊 您的Groq API今日token配额已用完")
+                print(f"⏰ 请等待 {wait_time} 后再试")
+                print(f"💡 提示：可考虑升级到Dev Tier获得更多配额")
+                print(f"🔗 升级链接：https://console.groq.com/settings/billing\n")
+            else:
+                print(f"\n⚠️  API速率限制 - 请稍后再试 ⚠️\n")
+        
         raise
 
 async def rag_query(question):
@@ -446,8 +463,21 @@ Answer:"""
         return answer.strip()
 
     except Exception as e:
-        print(f"Error in RAG query: {str(e)}")
-        return "I apologize, but I encountered an error processing your question. Please try again."
+        error_str = str(e)
+        print(f"Error in RAG query: {error_str}")
+        
+        # 检测速率限制错误
+        if "rate_limit_reached" in error_str or "Rate limit reached" in error_str:
+            # 尝试提取等待时间
+            import re
+            time_match = re.search(r'Please try again in ([\d\.]+[ms]?[\d\.]*[sm])', error_str)
+            if time_match:
+                wait_time = time_match.group(1)
+                return f"I apologize, now isn't a great time for me, may you come back in {wait_time}?"
+            else:
+                return "I apologize, but I encountered an error processing your question. Please try again later."
+        
+        return "I apologize, but I encountered an error processing your question. Please try again later."
 
 
 async def main():
