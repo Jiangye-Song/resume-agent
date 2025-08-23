@@ -343,24 +343,25 @@ async def rag_query(question):
             print("No results returned from vector DB.")
             return "I couldn't find any relevant documents."
 
-        # Step 3: Apply priority filtering logic
+        # Step 3: Apply new priority filtering logic
         # priority越大，优先级越高（3=最高，2=中，1=低，0=最低）
-        # 将优先级2和3合并为一组，让LLM根据相关性和优先级自行排序
+        # 先取前5个最相关的结果，然后在这5个中按优先级分组
         
-        # 分别筛选高优先级（>=2）和低优先级（<=1）结果
-        high_priority_results = [r for r in all_results if r['priority'] >= 2]
-        low_priority_results = [r for r in all_results if r['priority'] <= 1]
+        # 先按分数排序，取前5个最相关的结果
+        top_5_results = sorted(all_results, key=lambda x: x['score'], reverse=True)[:5]
         
-        print(f"🔍 Debug: Found {len(high_priority_results)} high-priority (>=2) results")
-        print(f"🔍 Debug: Found {len(low_priority_results)} low-priority (<=1) results")
+        # 在前5个结果中分别筛选高优先级（>=2）和低优先级（<=1）
+        high_priority_filtered = [r for r in top_5_results if r['priority'] >= 2]
+        low_priority_filtered = [r for r in top_5_results if r['priority'] <= 1]
         
-        # 获取前5个高优先级结果，按分数排序（让LLM根据优先级做决定）
-        high_priority_filtered = sorted(high_priority_results, key=lambda x: x['score'], reverse=True)[:5]
+        print(f"🔍 Debug: Top 5 most relevant results selected")
+        print(f"🔍 Debug: Among top 5 - {len(high_priority_filtered)} high-priority (>=2), {len(low_priority_filtered)} low-priority (<=1)")
         
-        # 获取分数最高的2个低优先级结果
-        low_priority_filtered = sorted(low_priority_results, key=lambda x: x['score'], reverse=True)[:2] if low_priority_results else []
+        # 在各自分组内按分数排序
+        high_priority_filtered = sorted(high_priority_filtered, key=lambda x: x['score'], reverse=True)
+        low_priority_filtered = sorted(low_priority_filtered, key=lambda x: x['score'], reverse=True)
         
-        print(f"✅ Using {len(high_priority_filtered)} high-priority results + {len(low_priority_filtered)} low-priority backups")
+        print(f"✅ Using {len(high_priority_filtered)} high-priority results + {len(low_priority_filtered)} low-priority results (all from top 5 most relevant)")
         
         # Step 4: Show friendly explanation of retrieved documents with priority info
         print("\n🧠 Retrieving relevant information to reason through your question...\n")
