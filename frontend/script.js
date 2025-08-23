@@ -77,3 +77,63 @@ form.addEventListener('submit', async (e) =>{
     appendMessage('Network error: ' + err.message, 'bot');
   }
 });
+
+// Quick suggestion questions functionality
+const questions = [
+  "What are your strongest technical skills?",
+  "Can you summarize your most recent project?", 
+  "Which project best demonstrates your frontend experience?",
+  "Have you worked with cloud deployment or serverless architecture?",
+  "Tell me about a project where you used machine learning.",
+  "What is the most challenging problem you've solved so far?",
+  "Which project highlights your teamwork and collaboration skills?",
+  "Do you have any experience working with vector databases or RAG systems?",
+  "What programming languages and frameworks do you use?",
+  "Tell me about your experience with database design."
+];
+
+function pickRandom(arr, count) {
+  const shuffled = [...arr].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count);
+}
+
+function renderSuggestions() {
+  const container = document.getElementById("question-buttons");
+  if (!container) return;
+  
+  container.innerHTML = "";
+  const randomQs = pickRandom(questions, 3);
+  
+  randomQs.forEach(q => {
+    const btn = document.createElement("button");
+    btn.textContent = q;
+    btn.className = "suggestion-btn";
+    btn.type = "button"; // Prevent form submission
+    btn.onclick = () => {
+      const input = document.getElementById("question");
+      if (input) {
+        input.value = q;
+        input.focus();
+        // Hide suggestions after selecting one
+        document.getElementById("suggestions").style.display = "none";
+      }
+    };
+    container.appendChild(btn);
+  });
+}
+
+// Show suggestions again when input is cleared
+input.addEventListener('input', () => {
+  const suggestionsDiv = document.getElementById("suggestions");
+  if (input.value.trim() === '') {
+    suggestionsDiv.style.display = "block";
+    renderSuggestions(); // Refresh suggestions when input is cleared
+  } else {
+    suggestionsDiv.style.display = "none";
+  }
+});
+
+// Initial render
+document.addEventListener("DOMContentLoaded", () => {
+  renderSuggestions();
+});

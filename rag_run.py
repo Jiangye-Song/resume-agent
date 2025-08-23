@@ -150,40 +150,30 @@ async def load_projects_from_db():
 
     conn = await asyncpg.connect(DATABASE_URL)
     try:
-        rows = await conn.fetch('SELECT data FROM projects ORDER BY id')
+        # Select all fields including new date and priority fields, ordered by priority desc
+        rows = await conn.fetch('''
+            SELECT id, title, summary, tags, url, data, start_date, end_date, priority 
+            FROM projects 
+            ORDER BY priority DESC, id
+        ''')
         items = []
         for r in rows:
             try:
                 d = r['data']
                 if isinstance(d, str):
                     d = json.loads(d)
-                items.append(d)
-            except Exception:
-                continue
-        return items
-    finally:
-        await conn.close()
-
-
-async def load_projects_from_db():
-    """Load projects data from Postgres if DATABASE_URL is set. Returns a list of dicts from projects table."""
-    DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
-    if not DATABASE_URL:
-        return None
-    if asyncpg is None:
-        raise RuntimeError('asyncpg not installed; cannot load projects from Postgres')
-
-    conn = await asyncpg.connect(DATABASE_URL)
-    try:
-        rows = await conn.fetch('SELECT data FROM projects ORDER BY id')
-        items = []
-        for r in rows:
-            try:
-                d = r['data']
-                if isinstance(d, str):
-                    d = json.loads(d)
-                # Mark source so migrate_data can format it correctly
+                # Add database fields to the data object
                 if isinstance(d, dict):
+                    d['id'] = r['id']
+                    d['title'] = r['title'] 
+                    d['summary'] = r['summary']
+                    d['tags'] = list(r['tags']) if r['tags'] else []
+                    d['url'] = r['project_detail_url']
+                    d['priority'] = r['priority']
+                    if r['start_date']:
+                        d['start_date'] = r['start_date'].isoformat()
+                    if r['end_date']:
+                        d['end_date'] = r['end_date'].isoformat()
                     d['_source'] = 'project'
                 items.append(d)
             except Exception:
@@ -234,6 +224,9 @@ async def migrate_data():
                 'summary': summary,
                 'tags': item.get('tags', []),
                 'url': item.get('url', ''),
+                'priority': item.get('priority', 3),
+                'start_date': item.get('start_date'),
+                'end_date': item.get('end_date'),
                 'source': 'project',
                 'data': item,
             }
@@ -256,7 +249,6 @@ async def get_completion(prompt):
     try:
         # Load system prompt dynamically from database
         system_prompt = await load_system_prompt_from_db()
-        print("SYSTEM_PROMPT: ", system_prompt)
         # groq.Client returns a synchronous object; run it in a thread
         def sync_call():
             # Include a system prompt to orient the assistant
@@ -296,56 +288,156 @@ async def rag_query(question):
         )
 
         # Use the SDK's `data` keyword so Upstash will embed the text automatically
+        # Get more results initially to allow for priority filtering
         results = await asyncio.to_thread(
-            index.query, data=question, top_k=3, include_metadata=True
+            index.query, data=question, top_k=10, include_metadata=True
         )
 
-        # Step 2: Extract documents (handle both attribute and dict-like responses)
-        top_docs = []
-        top_ids = []
+        # Step 2: Extract documents and apply priority filtering
+        all_results = []
         for r in results:
             try:
                 # SDK may return objects with .metadata/.id
                 meta = getattr(r, "metadata", None)
                 rid = getattr(r, "id", None)
+                score = getattr(r, "score", 0)
+                
                 if meta is None and isinstance(r, dict):
                     meta = r.get("metadata")
                     rid = r.get("id")
-                text = None
+                    score = r.get("score", 0)
+                
                 if isinstance(meta, dict):
-                    text = meta.get("text")
-                elif hasattr(meta, "get"):
-                    text = meta.get("text")
-
-                if text is None:
-                    # Fallback: if the match itself is a simple string
-                    text = str(r)
-
-                top_docs.append(text)
-                top_ids.append(str(rid))
+                    priority = meta.get("priority", 3)
+                    # 从metadata中构建文本内容，包含tags信息
+                    title = meta.get("title", "")
+                    summary = meta.get("summary", "")
+                    tags = meta.get("tags", [])
+                    
+                    # 构建包含tags的完整文本
+                    tags_text = f"[Tags: {', '.join(tags)}]" if tags else ""
+                    if title and summary and tags_text:
+                        text = f"{title}. {summary} {tags_text}"
+                    elif title and summary:
+                        text = f"{title}. {summary}"
+                    elif title and tags_text:
+                        text = f"{title}. {tags_text}"
+                    else:
+                        text = title or summary or tags_text or "No content available"
+                    
+                    # 对于优先级为0的结果，将score降低至一半
+                    adjusted_score = score / 2 if priority == 0 else score
+                    
+                    all_results.append({
+                        'text': text,
+                        'id': str(rid),
+                        'priority': priority,
+                        'score': adjusted_score,
+                        'original_score': score,
+                        'metadata': meta
+                    })
             except Exception:
                 continue
 
-        if not top_docs:
+        if not all_results:
             print("No results returned from vector DB.")
             return "I couldn't find any relevant documents."
 
-        # Step 3: Show friendly explanation of retrieved documents
+        # Step 3: Apply priority filtering logic
+        # priority越大，优先级越高（3=最高，2=中，1=低，0=最低）
+        # 将优先级2和3合并为一组，让LLM根据相关性和优先级自行排序
+        
+        # 分别筛选高优先级（>=2）和低优先级（<=1）结果
+        high_priority_results = [r for r in all_results if r['priority'] >= 2]
+        low_priority_results = [r for r in all_results if r['priority'] <= 1]
+        
+        print(f"🔍 Debug: Found {len(high_priority_results)} high-priority (>=2) results")
+        print(f"🔍 Debug: Found {len(low_priority_results)} low-priority (<=1) results")
+        
+        # 获取前5个高优先级结果，按分数排序（让LLM根据优先级做决定）
+        high_priority_filtered = sorted(high_priority_results, key=lambda x: x['score'], reverse=True)[:5]
+        
+        # 获取分数最高的2个低优先级结果
+        low_priority_filtered = sorted(low_priority_results, key=lambda x: x['score'], reverse=True)[:2] if low_priority_results else []
+        
+        print(f"✅ Using {len(high_priority_filtered)} high-priority results + {len(low_priority_filtered)} low-priority backups")
+        
+        # Step 4: Show friendly explanation of retrieved documents with priority info
         print("\n🧠 Retrieving relevant information to reason through your question...\n")
-        for i, doc in enumerate(top_docs):
-            print(f"🔹 Source {i + 1} (ID: {top_ids[i]}):")
-            print(f"    \"{doc}\"\n")
+        
+        if high_priority_filtered:
+            print("📋 High Priority Sources (Priority 3 = Highest, Priority 2 = Medium):")
+            for i, result in enumerate(high_priority_filtered):
+                priority = result['priority']
+                score = result['score']
+                doc = result['text']
+                doc_id = result['id']
+                
+                priority_label = "P3-Highest" if priority == 3 else "P2-Medium"
+                print(f"🔹 Source {i + 1} [{priority_label}] (ID: {doc_id}, score={score:.4f}):")
+                print(f"    \"{doc}\"\n")
+        
+        if low_priority_filtered:
+            print("📌 Low Priority Backup Source:")
+            for i, result in enumerate(low_priority_filtered):
+                priority = result['priority']
+                score = result['score']
+                doc = result['text']
+                doc_id = result['id']
+                
+                print(f"� Backup (ID: {doc_id}, priority={priority}, score={score:.4f}):")
+                print(f"    \"{doc}\"\n")
 
         print("📚 These seem to be the most relevant pieces of information to answer your question.\n")
 
-        # Step 4: Build prompt from context
-        context = "\n".join(top_docs)
-        prompt = f"""Use the following context to answer the question.
+                # Step 5: Build prompt from context with priority guidance for LLM
+        high_priority_context = "\n".join([r['text'] for r in high_priority_filtered]) if high_priority_filtered else ""
+        low_priority_context = "\n".join([r['text'] for r in low_priority_filtered]) if low_priority_filtered else ""
+        
+        # 构建带有优先级指导的上下文
+        if high_priority_filtered:
+            priority_3_items = [r for r in high_priority_filtered if r['priority'] == 3]
+            priority_2_items = [r for r in high_priority_filtered if r['priority'] == 2]
+            
+            context_with_priority = ""
+            if priority_3_items:
+                priority_3_context = "\n".join([r['text'] for r in priority_3_items])
+                context_with_priority += f"[HIGHEST PRIORITY - Display these first if relevant]:\n{priority_3_context}\n\n"
+            
+            if priority_2_items:
+                priority_2_context = "\n".join([r['text'] for r in priority_2_items])
+                context_with_priority += f"[MEDIUM PRIORITY - Display after highest priority items]:\n{priority_2_context}\n\n"
+        
+        if high_priority_context and low_priority_context:
+            prompt = f"""Use the following context to answer the question. When selecting information to display, prioritize items marked as [HIGHEST PRIORITY] over [MEDIUM PRIORITY].
 
 Context:
-{context}
+{context_with_priority.strip()}
 
 Question: {question}
+
+If none of the context above solve the question, you may also reference the following backup context:
+{low_priority_context}
+
+Answer:"""
+        elif high_priority_context:
+            prompt = f"""Use the following context to answer the question. When selecting information to display, prioritize items marked as [HIGHEST PRIORITY] over [MEDIUM PRIORITY].
+
+Context:
+{context_with_priority.strip()}
+
+Question: {question}
+Answer:"""
+        elif low_priority_context:
+            prompt = f"""Use the following context to answer the question.
+
+Context:
+{low_priority_context}
+
+Question: {question}
+Answer:"""
+        else:
+            prompt = f"""Question: {question}
 Answer:"""
 
         # Step 5: Generate answer with Groq

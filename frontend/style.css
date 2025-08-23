@@ -100,3 +100,44 @@ header h1 {
     color: #6b7280;
     margin-top: 6px;
 }
+
+/* Quick suggestions styles */
+.suggestions {
+    padding: 12px 16px;
+    border-top: 1px solid #eef2f6;
+}
+
+.suggestions h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+}
+
+.question-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.suggestion-btn {
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid #dfe8f5;
+    background: #f8fafc;
+    color: #374151;
+    font-size: 13px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.suggestion-btn:hover {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+    transform: translateY(-1px);
+}
+
+.suggestion-btn:active {
+    transform: translateY(0);
+}

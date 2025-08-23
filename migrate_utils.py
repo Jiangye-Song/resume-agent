@@ -40,17 +40,35 @@ async def migrate_projects_async():
 
     conn = await asyncpg.connect(DATABASE_URL)
     try:
-        rows = await conn.fetch('SELECT data FROM projects ORDER BY id')
+        # 读取完整的项目信息，包括priority和日期字段
+        rows = await conn.fetch('''
+            SELECT id, title, summary, tags, url, data, start_date, end_date, priority 
+            FROM projects 
+            ORDER BY priority DESC, id
+        ''')
         items = []
         for r in rows:
-            d = r['data']
-            if isinstance(d, str):
-                try:
+            try:
+                d = r['data']
+                if isinstance(d, str):
                     d = json.loads(d)
-                except Exception:
-                    # keep as string fallback
-                    d = {'text': str(d)}
-            items.append(d)
+                
+                # 将数据库字段添加到data对象中
+                if isinstance(d, dict):
+                    d['id'] = r['id']
+                    d['title'] = r['title'] 
+                    d['summary'] = r['summary']
+                    d['tags'] = list(r['tags']) if r['tags'] else []
+                    d['url'] = r['url']
+                    d['priority'] = r['priority']
+                    if r['start_date']:
+                        d['start_date'] = r['start_date'].isoformat()
+                    if r['end_date']:
+                        d['end_date'] = r['end_date'].isoformat()
+                    d['_source'] = 'project'
+                items.append(d)
+            except Exception:
+                continue
     finally:
         await conn.close()
 
@@ -75,7 +93,10 @@ async def migrate_projects_async():
                 'title': title,
                 'summary': summary,
                 'tags': item.get('tags', []) if isinstance(item, dict) else [],
-                'project-detail-url': item.get('url', '') if isinstance(item, dict) else '',
+                'url': item.get('url', '') if isinstance(item, dict) else '',
+                'priority': item.get('priority', 3),  # 包含优先级，默认为3
+                'start_date': item.get('start_date'),  # 包含开始日期
+                'end_date': item.get('end_date'),      # 包含结束日期
                 'source': 'project',
                 # store raw data but be cautious about size; this is optional
                 'data': item if isinstance(item, dict) else {'text': str(item)}
