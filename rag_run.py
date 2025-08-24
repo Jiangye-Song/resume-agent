@@ -395,23 +395,23 @@ async def rag_query(question):
 
         # Step 3: Apply new priority filtering logic
         # priority越大，优先级越高（3=最高，2=中，1=低，0=最低）
-        # 先取前5个最相关的结果，然后在这5个中按优先级分组
+        # 先取前4个最相关的结果，然后在这4个中按优先级分组
         
-        # 先按分数排序，取前5个最相关的结果
-        top_5_results = sorted(all_results, key=lambda x: x['score'], reverse=True)[:5]
+        # 先按分数排序，取前4个最相关的结果
+        top_4_results = sorted(all_results, key=lambda x: x['score'], reverse=True)[:4]
         
-        # 在前5个结果中分别筛选高优先级（>=2）和低优先级（<=1）
-        high_priority_filtered = [r for r in top_5_results if r['priority'] >= 2]
-        low_priority_filtered = [r for r in top_5_results if r['priority'] <= 1]
+        # 在前4个结果中分别筛选高优先级（>=2）和低优先级（<=1）
+        high_priority_filtered = [r for r in top_4_results if r['priority'] >= 2]
+        low_priority_filtered = [r for r in top_4_results if r['priority'] <= 1]
         
-        print(f"🔍 Debug: Top 5 most relevant results selected")
-        print(f"🔍 Debug: Among top 5 - {len(high_priority_filtered)} high-priority (>=2), {len(low_priority_filtered)} low-priority (<=1)")
+        print(f"🔍 Debug: Top 4 most relevant results selected")
+        print(f"🔍 Debug: Among top 4 - {len(high_priority_filtered)} high-priority (>=2), {len(low_priority_filtered)} low-priority (<=1)")
         
         # 在各自分组内按分数排序
         high_priority_filtered = sorted(high_priority_filtered, key=lambda x: x['score'], reverse=True)
         low_priority_filtered = sorted(low_priority_filtered, key=lambda x: x['score'], reverse=True)
         
-        print(f"✅ Using {len(high_priority_filtered)} high-priority results + {len(low_priority_filtered)} low-priority results (all from top 5 most relevant)")
+        print(f"✅ Using {len(high_priority_filtered)} high-priority results + {len(low_priority_filtered)} low-priority results (all from top 4 most relevant)")
         
         # Step 4: Show friendly explanation of retrieved documents with priority info
         print("\n🧠 Retrieving relevant information to reason through your question...\n")
