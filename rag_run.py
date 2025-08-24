@@ -200,7 +200,7 @@ async def load_projects_from_db():
                     d['title'] = r['title'] 
                     d['summary'] = r['summary']
                     d['tags'] = list(r['tags']) if r['tags'] else []
-                    d['url'] = r['project_detail_url']
+                    d['project-detail-site'] = r['url']
                     d['priority'] = r['priority']
                     if r['start_date']:
                         d['start_date'] = r['start_date'].isoformat()
@@ -255,7 +255,7 @@ async def migrate_data():
                 'title': title,
                 'summary': summary,
                 'tags': item.get('tags', []),
-                'url': item.get('url', ''),
+                'project-detail-site': item.get('url', ''),
                 'priority': item.get('priority', 3),
                 'start_date': item.get('start_date'),
                 'end_date': item.get('end_date'),

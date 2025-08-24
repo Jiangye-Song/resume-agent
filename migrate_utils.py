@@ -59,7 +59,7 @@ async def migrate_projects_async():
                     d['title'] = r['title'] 
                     d['summary'] = r['summary']
                     d['tags'] = list(r['tags']) if r['tags'] else []
-                    d['url'] = r['url']
+                    d['project-detail-site'] = r['url']
                     d['priority'] = r['priority']
                     if r['start_date']:
                         d['start_date'] = r['start_date'].isoformat()
