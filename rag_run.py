@@ -57,6 +57,38 @@ if LLM_PROVIDER != "groq":
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 
+def format_wait_time(time_str):
+    """将时间字符串转换为简洁的分钟格式"""
+    import re
+    
+    # 解析时间字符串，例如: "18m22.471999999s"
+    minutes = 0
+    seconds = 0
+    
+    # 提取分钟
+    min_match = re.search(r'(\d+)m', time_str)
+    if min_match:
+        minutes = int(min_match.group(1))
+    
+    # 提取秒数
+    sec_match = re.search(r'([\d\.]+)s', time_str)
+    if sec_match:
+        seconds = float(sec_match.group(1))
+    
+    # 如果只有秒数，转换为分钟
+    if minutes == 0 and seconds > 0:
+        minutes = int(seconds / 60)
+        if seconds % 60 > 0:  # 如果有余秒，分钟数+1
+            minutes += 1
+    elif seconds > 0:  # 如果有分钟也有秒数，分钟数+1
+        minutes += 1
+    
+    # 确保至少显示1分钟
+    if minutes == 0:
+        minutes = 1
+    
+    return f"{minutes}min"
+
 async def ensure_config_table():
     """Ensure config table exists and has default system prompt on startup."""
     DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
@@ -275,14 +307,15 @@ async def get_completion(prompt):
         
         # 检测速率限制错误并提取等待时间
         if "rate_limit_reached" in error_str or "Rate limit reached" in error_str:
-            # 尝试提取等待时间
+            # 尝试提取等待时间并转换为简洁格式
             import re
             time_match = re.search(r'Please try again in ([\d\.]+[ms]?[\d\.]*[sm])', error_str)
             if time_match:
-                wait_time = time_match.group(1)
+                wait_time_raw = time_match.group(1)
+                wait_time_formatted = format_wait_time(wait_time_raw)
                 print(f"\n⚠️  API速率限制提醒 ⚠️")
                 print(f"📊 您的Groq API今日token配额已用完")
-                print(f"⏰ 请等待 {wait_time} 后再试")
+                print(f"⏰ 请等待 {wait_time_formatted} 后再试")
                 print(f"💡 提示：可考虑升级到Dev Tier获得更多配额")
                 print(f"🔗 升级链接：https://console.groq.com/settings/billing\n")
             else:
@@ -468,12 +501,13 @@ Answer:"""
         
         # 检测速率限制错误
         if "rate_limit_reached" in error_str or "Rate limit reached" in error_str:
-            # 尝试提取等待时间
+            # 尝试提取等待时间并转换为简洁格式
             import re
             time_match = re.search(r'Please try again in ([\d\.]+[ms]?[\d\.]*[sm])', error_str)
             if time_match:
-                wait_time = time_match.group(1)
-                return f"I apologize, now isn't a great time for me, may you come back in {wait_time}?"
+                wait_time_raw = time_match.group(1)
+                wait_time_formatted = format_wait_time(wait_time_raw)
+                return f"I apologize, now isn't a great time for me, may you come back in {wait_time_formatted}?"
             else:
                 return "I apologize, but I encountered an error processing your question. Please try again later."
         
