@@ -42,7 +42,7 @@ async def migrate_projects_async():
     try:
         # 读取完整的项目信息，包括priority和日期字段
         rows = await conn.fetch('''
-            SELECT id, title, summary, tags, url, data, start_date, end_date, priority 
+            SELECT id, title, summary, tags, project_detail_site, data, start_date, end_date, priority 
             FROM projects 
             ORDER BY priority DESC, id
         ''')
@@ -59,7 +59,7 @@ async def migrate_projects_async():
                     d['title'] = r['title'] 
                     d['summary'] = r['summary']
                     d['tags'] = list(r['tags']) if r['tags'] else []
-                    d['project-detail-site'] = r['url']
+                    d['project-detail-site'] = r['project_detail_site']
                     d['priority'] = r['priority']
                     if r['start_date']:
                         d['start_date'] = r['start_date'].isoformat()
@@ -93,7 +93,7 @@ async def migrate_projects_async():
                 'title': title,
                 'summary': summary,
                 'tags': item.get('tags', []) if isinstance(item, dict) else [],
-                'project-detail-site': item.get('url', '') if isinstance(item, dict) else '',
+                'project-detail-site': item.get('project-detail-site', '') if isinstance(item, dict) else '',
                 'priority': item.get('priority', 3),  # 包含优先级，默认为3
                 'start_date': item.get('start_date'),  # 包含开始日期
                 'end_date': item.get('end_date'),      # 包含结束日期

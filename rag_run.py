@@ -184,7 +184,7 @@ async def load_projects_from_db():
     try:
         # Select all fields including new date and priority fields, ordered by priority desc
         rows = await conn.fetch('''
-            SELECT id, title, summary, tags, url, data, start_date, end_date, priority 
+            SELECT id, title, summary, tags, project_detail_site, data, start_date, end_date, priority 
             FROM projects 
             ORDER BY priority DESC, id
         ''')
@@ -200,7 +200,7 @@ async def load_projects_from_db():
                     d['title'] = r['title'] 
                     d['summary'] = r['summary']
                     d['tags'] = list(r['tags']) if r['tags'] else []
-                    d['project-detail-site'] = r['url']
+                    d['project_detail_site'] = r['project_detail_site']
                     d['priority'] = r['priority']
                     if r['start_date']:
                         d['start_date'] = r['start_date'].isoformat()
@@ -255,7 +255,7 @@ async def migrate_data():
                 'title': title,
                 'summary': summary,
                 'tags': item.get('tags', []),
-                'project-detail-site': item.get('url', ''),
+                'project-detail-site': item.get('project_detail_site', ''),
                 'priority': item.get('priority', 3),
                 'start_date': item.get('start_date'),
                 'end_date': item.get('end_date'),
@@ -359,21 +359,29 @@ async def rag_query(question):
                 
                 if isinstance(meta, dict):
                     priority = meta.get("priority", 3)
-                    # 从metadata中构建文本内容，包含tags信息
+                    # 从metadata中构建文本内容，包含tags和网址信息
                     title = meta.get("title", "")
                     summary = meta.get("summary", "")
                     tags = meta.get("tags", [])
+                    project_site = meta.get("project-detail-site", "")
                     
-                    # 构建包含tags的完整文本
+                    # 构建包含tags和网址的完整文本
                     tags_text = f"[Tags: {', '.join(tags)}]" if tags else ""
-                    if title and summary and tags_text:
+                    site_text = f"[Site: {project_site}]" if project_site else ""
+                    
+                    # 组合所有信息
+                    if title and summary and tags_text and site_text:
+                        text = f"{title}. {summary} {tags_text} {site_text}"
+                    elif title and summary and tags_text:
                         text = f"{title}. {summary} {tags_text}"
+                    elif title and summary and site_text:
+                        text = f"{title}. {summary} {site_text}"
                     elif title and summary:
                         text = f"{title}. {summary}"
-                    elif title and tags_text:
-                        text = f"{title}. {tags_text}"
+                    elif title and (tags_text or site_text):
+                        text = f"{title}. {tags_text} {site_text}".strip()
                     else:
-                        text = title or summary or tags_text or "No content available"
+                        text = title or summary or tags_text or site_text or "No content available"
                     
                     # 对于优先级为0的结果，将score降低至一半
                     adjusted_score = score / 2 if priority == 0 else score
