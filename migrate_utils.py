@@ -93,7 +93,7 @@ async def migrate_projects_async():
                 'title': title,
                 'summary': summary,
                 'tags': item.get('tags', []) if isinstance(item, dict) else [],
-                'url': item.get('url', '') if isinstance(item, dict) else '',
+                'project-detail-site': item.get('url', '') if isinstance(item, dict) else '',
                 'priority': item.get('priority', 3),  # 包含优先级，默认为3
                 'start_date': item.get('start_date'),  # 包含开始日期
                 'end_date': item.get('end_date'),      # 包含结束日期
