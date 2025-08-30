@@ -129,7 +129,8 @@ header h1 {
     color: #374151;
     font-size: 13px;
     transition: all 0.2s ease;
-    white-space: nowrap;
+    white-space: normal;
+    text-align: left;
 }
 
 .suggestion-btn:hover {
