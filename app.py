@@ -226,6 +226,135 @@ def admin_records():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+@app.route('/api/admin/records/<record_id>', methods=['GET', 'PUT', 'DELETE'])
+def admin_record_detail(record_id):
+    """Get, update, or delete a specific record."""
+    try:
+        # For all operations, verify password from request body or query params
+        if request.method == 'GET':
+            password = request.args.get('password', '')
+        else:
+            body = request.get_json() or {}
+            password = body.get('password', '')
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        is_valid = loop.run_until_complete(verify_password_async(password))
+        
+        if not is_valid:
+            return jsonify({'status': 'error', 'message': 'Invalid password'}), 401
+        
+        DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
+        if not DATABASE_URL:
+            return jsonify({'status': 'error', 'message': 'Database not configured'}), 500
+        
+        if request.method == 'GET':
+            # Get single record
+            async def get_record_async():
+                conn = await asyncpg.connect(DATABASE_URL)
+                try:
+                    row = await conn.fetchrow('''
+                        SELECT id, type, title, summary, tags, detail_site, additional_url,
+                               start_date, end_date, priority
+                        FROM records
+                        WHERE id = $1
+                    ''', record_id)
+                    
+                    if not row:
+                        return {'status': 'error', 'message': 'Record not found'}
+                    
+                    record = {
+                        'id': row['id'],
+                        'type': row['type'],
+                        'title': row['title'],
+                        'summary': row['summary'],
+                        'tags': list(row['tags']) if row['tags'] else [],
+                        'detail_site': row['detail_site'],
+                        'additional_url': row['additional_url'] if row['additional_url'] else [],
+                        'start_date': row['start_date'].isoformat() if row['start_date'] else None,
+                        'end_date': row['end_date'].isoformat() if row['end_date'] else None,
+                        'priority': row['priority']
+                    }
+                    
+                    return {'status': 'ok', 'record': record}
+                finally:
+                    await conn.close()
+            
+            result = loop.run_until_complete(get_record_async())
+            return jsonify(result)
+        
+        elif request.method == 'PUT':
+            # Update record
+            body = request.get_json() or {}
+            record = body.get('record', {})
+            
+            if not record.get('type') or not record.get('title'):
+                return jsonify({
+                    'status': 'error', 
+                    'message': 'Missing required fields: type, title'
+                }), 400
+            
+            async def update_record_async():
+                conn = await asyncpg.connect(DATABASE_URL)
+                try:
+                    # Parse additional_url if it's a string
+                    additional_url = record.get('additional_url', [])
+                    if isinstance(additional_url, str):
+                        import json
+                        try:
+                            additional_url = json.loads(additional_url)
+                        except:
+                            additional_url = []
+                    
+                    result = await conn.execute('''
+                        UPDATE records 
+                        SET type = $2, title = $3, summary = $4, tags = $5, detail_site = $6,
+                            additional_url = $7, start_date = $8::date, end_date = $9::date, priority = $10
+                        WHERE id = $1
+                    ''', 
+                        record_id,
+                        record['type'],
+                        record['title'],
+                        record.get('summary'),
+                        record.get('tags', []),
+                        record.get('detail_site'),
+                        additional_url,
+                        record.get('start_date'),
+                        record.get('end_date'),
+                        record.get('priority', 3)
+                    )
+                    
+                    if result == 'UPDATE 0':
+                        return {'status': 'error', 'message': 'Record not found'}
+                    
+                    return {'status': 'ok', 'message': 'Record updated successfully', 'id': record_id}
+                finally:
+                    await conn.close()
+            
+            result = loop.run_until_complete(update_record_async())
+            return jsonify(result)
+        
+        elif request.method == 'DELETE':
+            # Delete record
+            async def delete_record_async():
+                conn = await asyncpg.connect(DATABASE_URL)
+                try:
+                    result = await conn.execute('DELETE FROM records WHERE id = $1', record_id)
+                    
+                    if result == 'DELETE 0':
+                        return {'status': 'error', 'message': 'Record not found'}
+                    
+                    return {'status': 'ok', 'message': 'Record deleted successfully', 'id': record_id}
+                finally:
+                    await conn.close()
+            
+            result = loop.run_until_complete(delete_record_async())
+            return jsonify(result)
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/api/admin/upsert-all', methods=['POST'])
 def admin_upsert_all():
     """Trigger upsert of all records to Upstash Vector."""

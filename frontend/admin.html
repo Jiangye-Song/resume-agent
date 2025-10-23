@@ -394,6 +394,71 @@
             padding-bottom: 8px;
             border-bottom: 1px solid hsl(var(--border));
         }
+
+        .additional-url-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: hsl(var(--card));
+            border-radius: var(--radius);
+            padding: 32px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            border: 1px solid hsl(var(--border));
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: hsl(var(--muted-foreground));
+            padding: 4px;
+        }
+
+        .close-btn:hover {
+            color: hsl(var(--foreground));
+        }
+
+        .action-cell {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-cell button {
+            padding: 6px 12px;
+            font-size: 0.75rem;
+        }
     </style>
 </head>
 <body>
@@ -468,6 +533,17 @@
                                 <label for="newDetailSite">Detail Site URL</label>
                                 <input type="text" id="newDetailSite" placeholder="https://github.com/..." />
                             </div>
+                            <div class="form-full">
+                                <label>Additional URLs</label>
+                                <div id="additionalUrlsContainer">
+                                    <div class="additional-url-row">
+                                        <input type="text" placeholder="Label (e.g., Demo, Documentation)" class="url-label" style="width: 30%; margin-right: 8px;" />
+                                        <input type="text" placeholder="https://..." class="url-value" style="width: 60%; margin-right: 8px;" />
+                                        <button type="button" class="ghost" onclick="removeUrlRow(this)" style="width: 10%; padding: 10px 8px;">×</button>
+                                    </div>
+                                </div>
+                                <button type="button" class="secondary" onclick="addUrlRow()" style="margin-top: 8px;">Add URL</button>
+                            </div>
                             <div>
                                 <label for="newStartDate">Start Date</label>
                                 <input type="text" id="newStartDate" placeholder="YYYY-MM-DD" />
@@ -520,12 +596,96 @@
                                 <th>Tags</th>
                                 <th>Priority</th>
                                 <th>Dates</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="recordsBody">
-                            <tr><td colspan="6" style="text-align: center; padding: 40px; color: hsl(var(--muted-foreground));">Loading records...</td></tr>
+                            <tr><td colspan="7" style="text-align: center; padding: 40px; color: hsl(var(--muted-foreground));">Loading records...</td></tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit/View Record Modal -->
+    <div id="editModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">View Record</h2>
+                <button class="close-btn" onclick="closeEditModal()">&times;</button>
+            </div>
+            
+            <div id="editForm">
+                <div class="form-section">
+                    <div class="form-section-title">Basic Information</div>
+                    <div class="form-grid">
+                        <div>
+                            <label for="editId">Record ID</label>
+                            <input type="text" id="editId" readonly style="background: hsl(var(--muted));" />
+                        </div>
+                        <div>
+                            <label for="editType">Type</label>
+                            <select id="editType">
+                                <option value="project">Project</option>
+                                <option value="experience">Experience</option>
+                                <option value="education">Education</option>
+                                <option value="certification">Certification</option>
+                                <option value="publication">Publication</option>
+                                <option value="award">Award</option>
+                            </select>
+                        </div>
+                        <div class="form-full">
+                            <label for="editTitle">Title</label>
+                            <input type="text" id="editTitle" />
+                        </div>
+                        <div class="form-full">
+                            <label for="editSummary">Summary</label>
+                            <textarea id="editSummary" rows="4"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <div class="form-section-title">Additional Details</div>
+                    <div class="form-grid">
+                        <div class="form-full">
+                            <label for="editTags">Tags</label>
+                            <input type="text" id="editTags" />
+                        </div>
+                        <div class="form-full">
+                            <label for="editDetailSite">Detail Site URL</label>
+                            <input type="text" id="editDetailSite" />
+                        </div>
+                        <div class="form-full">
+                            <label>Additional URLs</label>
+                            <div id="editAdditionalUrlsContainer"></div>
+                            <button type="button" class="secondary" onclick="addEditUrlRow()" style="margin-top: 8px;">Add URL</button>
+                        </div>
+                        <div>
+                            <label for="editStartDate">Start Date</label>
+                            <input type="text" id="editStartDate" />
+                        </div>
+                        <div>
+                            <label for="editEndDate">End Date</label>
+                            <input type="text" id="editEndDate" />
+                        </div>
+                        <div>
+                            <label for="editPriority">Priority</label>
+                            <select id="editPriority">
+                                <option value="3">3 - Highest</option>
+                                <option value="2">2 - Medium</option>
+                                <option value="1">1 - Low</option>
+                                <option value="0">0 - Hidden</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+                    <button class="secondary" onclick="closeEditModal()">Cancel</button>
+                    <button class="destructive" id="deleteBtn" onclick="deleteRecord()">Delete</button>
+                    <button class="primary" id="saveBtn" onclick="saveRecord()">Save Changes</button>
                 </div>
             </div>
         </div>
@@ -571,8 +731,7 @@
 
         async function loadRecords() {
             const tbody = document.getElementById('recordsBody');
-            const statsDiv = document.getElementById('stats');
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Loading...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading...</td></tr>';
 
             try {
                 const response = await fetch('/api/admin/records', {
@@ -591,7 +750,7 @@
                     document.getElementById('statTotal').textContent = data.count;
 
                     if (records.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: hsl(var(--muted-foreground));">No records found. Click "Add Record" to create one.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: hsl(var(--muted-foreground));">No records found. Click "Add Record" to create one.</td></tr>';
                         return;
                     }
 
@@ -612,6 +771,10 @@
                                 <td style="font-size: 0.8125rem;">${tags}</td>
                                 <td>${priorityBadge}</td>
                                 <td style="font-size: 0.8125rem; color: hsl(var(--muted-foreground));">${dates}</td>
+                                <td class="action-cell">
+                                    <button class="ghost" onclick="viewRecord('${r.id}')">View</button>
+                                    <button class="secondary" onclick="editRecord('${r.id}')">Edit</button>
+                                </td>
                             </tr>
                         `;
                     }).join('');
@@ -642,9 +805,30 @@
             document.getElementById('newDetailSite').value = '';
             document.getElementById('newStartDate').value = '';
             document.getElementById('newEndDate').value = '';
+            
+            // Clear additional URLs
+            const container = document.getElementById('additionalUrlsContainer');
+            container.innerHTML = `
+                <div class="additional-url-row">
+                    <input type="text" placeholder="Label (e.g., Demo, Documentation)" class="url-label" style="width: 30%; margin-right: 8px;" />
+                    <input type="text" placeholder="https://..." class="url-value" style="width: 60%; margin-right: 8px;" />
+                    <button type="button" class="ghost" onclick="removeUrlRow(this)" style="width: 10%; padding: 10px 8px;">×</button>
+                </div>
+            `;
         }
 
         async function createRecord() {
+            // Collect additional URLs
+            const additionalUrls = [];
+            const urlRows = document.querySelectorAll('#additionalUrlsContainer .additional-url-row');
+            urlRows.forEach(row => {
+                const label = row.querySelector('.url-label').value.trim();
+                const url = row.querySelector('.url-value').value.trim();
+                if (label && url) {
+                    additionalUrls.push([label, url]);
+                }
+            });
+
             const record = {
                 id: document.getElementById('newId').value.trim(),
                 type: document.getElementById('newType').value,
@@ -652,6 +836,7 @@
                 summary: document.getElementById('newSummary').value.trim(),
                 tags: document.getElementById('newTags').value.split(',').map(t => t.trim()).filter(t => t),
                 detail_site: document.getElementById('newDetailSite').value.trim(),
+                additional_url: additionalUrls,
                 start_date: document.getElementById('newStartDate').value.trim() || null,
                 end_date: document.getElementById('newEndDate').value.trim() || null,
                 priority: parseInt(document.getElementById('newPriority').value)
@@ -723,6 +908,220 @@
             messageDiv.className = `alert alert-${type}`;
             messageDiv.classList.remove('hidden');
             setTimeout(() => messageDiv.classList.add('hidden'), 5000);
+        }
+
+        // Additional URL management functions
+        function addUrlRow() {
+            const container = document.getElementById('additionalUrlsContainer');
+            const row = document.createElement('div');
+            row.className = 'additional-url-row';
+            row.innerHTML = `
+                <input type="text" placeholder="Label (e.g., Demo, Documentation)" class="url-label" style="width: 30%; margin-right: 8px;" />
+                <input type="text" placeholder="https://..." class="url-value" style="width: 60%; margin-right: 8px;" />
+                <button type="button" class="ghost" onclick="removeUrlRow(this)" style="width: 10%; padding: 10px 8px;">×</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function removeUrlRow(button) {
+            const container = document.getElementById('additionalUrlsContainer');
+            if (container.children.length > 1) {
+                button.parentElement.remove();
+            }
+        }
+
+        function addEditUrlRow() {
+            const container = document.getElementById('editAdditionalUrlsContainer');
+            const row = document.createElement('div');
+            row.className = 'additional-url-row';
+            row.innerHTML = `
+                <input type="text" placeholder="Label (e.g., Demo, Documentation)" class="url-label" style="width: 30%; margin-right: 8px;" />
+                <input type="text" placeholder="https://..." class="url-value" style="width: 60%; margin-right: 8px;" />
+                <button type="button" class="ghost" onclick="removeEditUrlRow(this)" style="width: 10%; padding: 10px 8px;">×</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function removeEditUrlRow(button) {
+            const container = document.getElementById('editAdditionalUrlsContainer');
+            if (container.children.length > 1) {
+                button.parentElement.remove();
+            }
+        }
+
+        // Edit/View modal functions
+        let currentEditId = '';
+
+        async function viewRecord(id) {
+            await openRecordModal(id, true);
+        }
+
+        async function editRecord(id) {
+            await openRecordModal(id, false);
+        }
+
+        async function openRecordModal(id, viewOnly = false) {
+            currentEditId = id;
+            
+            try {
+                const response = await fetch(`/api/admin/records/${id}?password=${encodeURIComponent(sessionPassword)}`);
+                const data = await response.json();
+
+                if (data.status !== 'ok') {
+                    showMessage(data.message, 'error');
+                    return;
+                }
+
+                const record = data.record;
+                
+                // Populate form
+                document.getElementById('editId').value = record.id;
+                document.getElementById('editType').value = record.type;
+                document.getElementById('editTitle').value = record.title || '';
+                document.getElementById('editSummary').value = record.summary || '';
+                document.getElementById('editTags').value = record.tags ? record.tags.join(', ') : '';
+                document.getElementById('editDetailSite').value = record.detail_site || '';
+                document.getElementById('editStartDate').value = record.start_date || '';
+                document.getElementById('editEndDate').value = record.end_date || '';
+                document.getElementById('editPriority').value = record.priority;
+
+                // Populate additional URLs
+                const urlContainer = document.getElementById('editAdditionalUrlsContainer');
+                urlContainer.innerHTML = '';
+                
+                if (record.additional_url && record.additional_url.length > 0) {
+                    record.additional_url.forEach(([label, url]) => {
+                        const row = document.createElement('div');
+                        row.className = 'additional-url-row';
+                        row.innerHTML = `
+                            <input type="text" value="${label}" class="url-label" style="width: 30%; margin-right: 8px;" ${viewOnly ? 'readonly' : ''} />
+                            <input type="text" value="${url}" class="url-value" style="width: 60%; margin-right: 8px;" ${viewOnly ? 'readonly' : ''} />
+                            <button type="button" class="ghost" onclick="removeEditUrlRow(this)" style="width: 10%; padding: 10px 8px;" ${viewOnly ? 'disabled' : ''}>×</button>
+                        `;
+                        urlContainer.appendChild(row);
+                    });
+                } else {
+                    // Add one empty row
+                    const row = document.createElement('div');
+                    row.className = 'additional-url-row';
+                    row.innerHTML = `
+                        <input type="text" placeholder="Label (e.g., Demo, Documentation)" class="url-label" style="width: 30%; margin-right: 8px;" ${viewOnly ? 'readonly' : ''} />
+                        <input type="text" placeholder="https://..." class="url-value" style="width: 60%; margin-right: 8px;" ${viewOnly ? 'readonly' : ''} />
+                        <button type="button" class="ghost" onclick="removeEditUrlRow(this)" style="width: 10%; padding: 10px 8px;" ${viewOnly ? 'disabled' : ''}>×</button>
+                    `;
+                    urlContainer.appendChild(row);
+                }
+
+                // Set modal title and form state
+                document.getElementById('modalTitle').textContent = viewOnly ? 'View Record' : 'Edit Record';
+                
+                // Disable/enable form elements for view mode
+                const formElements = document.querySelectorAll('#editForm input, #editForm select, #editForm textarea');
+                formElements.forEach(el => {
+                    if (el.id !== 'editId') { // ID is always readonly
+                        el.readOnly = viewOnly;
+                        el.disabled = viewOnly;
+                    }
+                });
+
+                // Show/hide action buttons
+                document.getElementById('saveBtn').style.display = viewOnly ? 'none' : 'inline-flex';
+                document.getElementById('deleteBtn').style.display = viewOnly ? 'none' : 'inline-flex';
+
+                // Show modal
+                document.getElementById('editModal').classList.remove('hidden');
+                
+            } catch (error) {
+                showMessage('Error loading record: ' + error.message, 'error');
+            }
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+            currentEditId = '';
+        }
+
+        async function saveRecord() {
+            if (!currentEditId) return;
+
+            // Collect additional URLs
+            const additionalUrls = [];
+            const urlRows = document.querySelectorAll('#editAdditionalUrlsContainer .additional-url-row');
+            urlRows.forEach(row => {
+                const label = row.querySelector('.url-label').value.trim();
+                const url = row.querySelector('.url-value').value.trim();
+                if (label && url) {
+                    additionalUrls.push([label, url]);
+                }
+            });
+
+            const record = {
+                type: document.getElementById('editType').value,
+                title: document.getElementById('editTitle').value.trim(),
+                summary: document.getElementById('editSummary').value.trim(),
+                tags: document.getElementById('editTags').value.split(',').map(t => t.trim()).filter(t => t),
+                detail_site: document.getElementById('editDetailSite').value.trim(),
+                additional_url: additionalUrls,
+                start_date: document.getElementById('editStartDate').value.trim() || null,
+                end_date: document.getElementById('editEndDate').value.trim() || null,
+                priority: parseInt(document.getElementById('editPriority').value)
+            };
+
+            if (!record.title) {
+                showMessage('Title is required', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/records/${currentEditId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        password: sessionPassword, 
+                        record 
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'ok') {
+                    showMessage(`Record "${currentEditId}" updated successfully`, 'success');
+                    closeEditModal();
+                    loadRecords();
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('Error updating record: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteRecord() {
+            if (!currentEditId) return;
+
+            if (!confirm(`Are you sure you want to delete record "${currentEditId}"? This action cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/records/${currentEditId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: sessionPassword })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'ok') {
+                    showMessage(`Record "${currentEditId}" deleted successfully`, 'success');
+                    closeEditModal();
+                    loadRecords();
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('Error deleting record: ' + error.message, 'error');
+            }
         }
 
         // Allow Enter key to login
