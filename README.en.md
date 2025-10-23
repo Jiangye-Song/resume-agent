@@ -1,20 +1,8 @@
 # 🧾 Resume Agent — Quick Guide
 
-**Languages:** [English](README.md) | [简体中文](README## Manual Trigger Upsert on GitHub Actions
+**Languages:** [English](README.md) | [简体中文](README.zh.md)
 
-The repository includes a manually triggered workflow: `.github/workflows/upsert.yml`, for executing `upsert_projects_to_vector.py` in CI.
-
-Usage steps:
-
-1. Add to repository Settings → Secrets:
-   - `DATABASE_URL`
-   - `UPSTASH_VECTOR_REST_URL`
-   - `UPSTASH_VECTOR_REST_TOKEN`
-   - Optional: `GROQ_API_KEY`, `MIGRATION_KEY`
-
-2. On the GitHub repository page, open Actions → select "Upsert Projects to Vector" → click `Run workflow`.
-
-This workflow will checkout, install dependencies and run `python upsert_projects_to_vector.py` (you can later modify the workflow to accept parameters like `--dry-run` or `project_id`).s a small RAG (Retrieval-Augmented Generation) / resume assistant project (Resume Agent).
+This is a small RAG (Retrieval-Augmented Generation) / resume assistant project (Resume Agent).
 Core concept: Convert structured project or resume information (stored in Neon/Postgres `projects` table) into vectors and save them in Upstash Vector. The frontend/Serverless retrieves relevant content during queries and uses LLM to generate data-based responses.
 
 This repository contains:
@@ -94,32 +82,32 @@ python app.py
 
 ---
 
-## 在 GitHub Actions 上手动触发 upsert
+## Manual Trigger Upsert on GitHub Actions
 
-仓库已包含一个手动触发的 workflow：`.github/workflows/upsert.yml`，用于在 CI 中执行 `upsert_projects_to_vector.py`。
+The repository includes a manually triggered workflow: `.github/workflows/upsert.yml`, for executing `upsert_projects_to_vector.py` in CI.
 
-使用步骤：
+Usage steps:
 
-1. 在仓库 Settings → Secrets 中添加：
+1. Add to repository Settings → Secrets:
    - `DATABASE_URL`
    - `UPSTASH_VECTOR_REST_URL`
    - `UPSTASH_VECTOR_REST_TOKEN`
-   - 可选：`GROQ_API_KEY`, `MIGRATION_KEY`
+   - Optional: `GROQ_API_KEY`, `MIGRATION_KEY`
 
-2. 在 GitHub 仓库页面，打开 Actions → 选择 “Upsert Projects to Vector” → 点击 `Run workflow`。
+2. On the GitHub repository page, open Actions → select "Upsert Projects to Vector" → click `Run workflow`.
 
-该 workflow 会 checkout、安装依赖并运行 `python upsert_projects_to_vector.py`（你可以在后续把 workflow 改为接受参数，例如 `--dry-run` 或 `project_id`）。
+This workflow will checkout, install dependencies and run `python upsert_projects_to_vector.py` (you can later modify the workflow to accept parameters like `--dry-run` or `project_id`).
 
 ---
 
-## ## Serverless / Deployment Notes
+## Serverless / Deployment Notes
 
 - `api/upsert-projects.py` is a FastAPI serverless endpoint (suitable for Vercel) for manually triggering one upsert. Serverless typically isn't suitable for long-running batch tasks (timeout limitations), so it's recommended to run large-scale or regular upserts in CI / Agent.
 - If you deploy the frontend to Vercel (static + serverless read API), ensure Upstash and Postgres are accessible (Vercel should configure corresponding Secrets), and upload operations are performed by CI or regular agents.
 
 ---
 
-## ## Debugging and Extension Suggestions
+## Debugging and Extension Suggestions
 
 - dry-run: I can add a `--dry-run` flag to `upsert_projects_to_vector.py` to print the enriched_text and metadata to be uploaded without writing. This is very useful for content review.
 - Batching and retry: If there are many projects, batch processing and retry strategies should be adopted in migration logic (extension points are reserved in `migrate_utils.py`).
@@ -127,7 +115,7 @@ python app.py
 
 ---
 
-## ## Developer Tips
+## Developer Tips
 
 - Code entry points: `migrate_utils.py` (migration logic), `upsert_projects_to_vector.py` (CLI), `api/upsert-projects.py` (serverless endpoint), `app.py` (local frontend).
 - If you need me to implement `--dry-run`, upsert by project id, or parameterized Actions input functionality to the workflow, tell me the parameters and default behavior you want, and I'll continue implementing and verifying.
@@ -141,5 +129,3 @@ If you need me to now:
 3) Change local frontend to call serverless read API (instead of local rag queries),
 
 Tell me the number, and I'll continue implementing and do a local verification (syntax check / quick run).
-````
-

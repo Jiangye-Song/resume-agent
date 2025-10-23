@@ -1,11 +1,12 @@
 """
-Utilities for migrating projects from Postgres (Neon) into Upstash Vector.
+Utilities for migrating records from Postgres (Neon) into Upstash Vector.
 
-Provides an async `migrate_projects_async()` function that reads `projects` table
-and upserts each project into Upstash Vector. Returns a stats dict.
+Provides an async `migrate_records_async()` function that reads `records` table
+and upserts each record into Upstash Vector with comprehensive metadata concatenation.
+Returns a stats dict.
 
 This module is usable from serverless endpoints (async) or CLI scripts via
-`asyncio.run(migrate_projects_async())`.
+`asyncio.run(migrate_records_async())`.
 """
 import os
 import json
@@ -22,8 +23,8 @@ except Exception:
 from upstash_vector import Index
 
 
-async def migrate_projects_async():
-    """Read projects from Postgres and upsert to Upstash Vector.
+async def migrate_records_async():
+    """Read records from Postgres and upsert to Upstash Vector with enhanced metadata.
 
     Returns a dict: { total, upserted, errors }
     """
@@ -40,73 +41,111 @@ async def migrate_projects_async():
 
     conn = await asyncpg.connect(DATABASE_URL)
     try:
-        # 读取完整的项目信息，包括priority和日期字段
+        # Read from records table with new schema
         rows = await conn.fetch('''
-            SELECT id, title, summary, tags, project_detail_site, data, start_date, end_date, priority 
-            FROM projects 
-            ORDER BY priority DESC, id
+            SELECT id, type, title, summary, tags, detail_site, additional_url, 
+                   start_date, end_date, priority
+            FROM records 
+            ORDER BY priority DESC, type, id
         ''')
-        items = []
+        
+        records = []
         for r in rows:
-            try:
-                d = r['data']
-                if isinstance(d, str):
-                    d = json.loads(d)
-                
-                # 将数据库字段添加到data对象中
-                if isinstance(d, dict):
-                    d['id'] = r['id']
-                    d['title'] = r['title'] 
-                    d['summary'] = r['summary']
-                    d['tags'] = list(r['tags']) if r['tags'] else []
-                    d['project-detail-site'] = r['project_detail_site']
-                    d['priority'] = r['priority']
-                    if r['start_date']:
-                        d['start_date'] = r['start_date'].isoformat()
-                    if r['end_date']:
-                        d['end_date'] = r['end_date'].isoformat()
-                    d['_source'] = 'project'
-                items.append(d)
-            except Exception:
-                continue
+            record = {
+                'id': r['id'],
+                'type': r['type'],
+                'title': r['title'],
+                'summary': r['summary'],
+                'tags': list(r['tags']) if r['tags'] else [],
+                'detail_site': r['detail_site'],
+                'additional_url': r['additional_url'] if r['additional_url'] else [],
+                'start_date': r['start_date'].isoformat() if r['start_date'] else None,
+                'end_date': r['end_date'].isoformat() if r['end_date'] else None,
+                'priority': r['priority']
+            }
+            records.append(record)
     finally:
         await conn.close()
 
-    total = len(items)
+    total = len(records)
     upserted = 0
     errors = []
 
     index = Index(url=UPSTASH_VECTOR_REST_URL, token=UPSTASH_VECTOR_REST_TOKEN)
 
-    for item in items:
+    for record in records:
         try:
-            title = item.get('title') if isinstance(item, dict) else None
-            summary = item.get('summary') if isinstance(item, dict) else None
-            if not title:
-                title = item.get('text') if isinstance(item, dict) else str(item)
-            if not summary:
-                summary = item.get('text') if isinstance(item, dict) else ''
-
-            enriched_text = f"{title}. {summary}" if summary else str(title)
-            pid = f"project:{item.get('id') or title}"
+            # Build comprehensive enriched text with ALL metadata
+            enriched_parts = []
+            
+            # 1. Title (highest semantic weight)
+            if record.get('title'):
+                enriched_parts.append(record['title'])
+            
+            # 2. Summary (detailed content)
+            if record.get('summary'):
+                enriched_parts.append(record['summary'])
+            
+            # 3. Tags (keywords for semantic search)
+            if record.get('tags'):
+                tags_str = ' '.join(record['tags'])
+                enriched_parts.append(f"Technologies: {tags_str}")
+            
+            # 4. Detail site URL
+            if record.get('detail_site'):
+                enriched_parts.append(f"Website: {record['detail_site']}")
+            
+            # 5. Additional URLs with labels
+            if record.get('additional_url'):
+                for url_pair in record['additional_url']:
+                    if len(url_pair) == 2:
+                        label, url = url_pair
+                        enriched_parts.append(f"{label.capitalize()}: {url}")
+            
+            # 6. Temporal information
+            date_parts = []
+            if record.get('start_date'):
+                date_parts.append(f"from {record['start_date']}")
+            if record.get('end_date'):
+                date_parts.append(f"to {record['end_date']}")
+            if date_parts:
+                enriched_parts.append(f"Duration {' '.join(date_parts)}")
+            
+            # 7. Type/Category
+            record_type = record.get('type', 'project')
+            enriched_parts.append(f"Category: {record_type}")
+            
+            # Join all parts into enriched text
+            enriched_text = ". ".join(enriched_parts) + "."
+            
+            # Build metadata for storage
             metadata = {
-                'title': title,
-                'summary': summary,
-                'tags': item.get('tags', []) if isinstance(item, dict) else [],
-                'project-detail-site': item.get('project-detail-site', '') if isinstance(item, dict) else '',
-                'priority': item.get('priority', 3),  # 包含优先级，默认为3
-                'start_date': item.get('start_date'),  # 包含开始日期
-                'end_date': item.get('end_date'),      # 包含结束日期
-                'source': 'project',
-                # store raw data but be cautious about size; this is optional
-                'data': item if isinstance(item, dict) else {'text': str(item)}
+                'id': record['id'],
+                'type': record_type,
+                'title': record.get('title', 'untitled'),
+                'summary': record.get('summary', ''),
+                'tags': record.get('tags', []),
+                'detail_site': record.get('detail_site', ''),
+                'additional_url': record.get('additional_url', []),
+                'start_date': record.get('start_date'),
+                'end_date': record.get('end_date'),
+                'priority': record.get('priority', 3),
+                'source': record_type  # Use type as source
             }
-
-            # Use to_thread to call the synchronous SDK method without blocking the loop
-            await asyncio.to_thread(index.upsert, [(str(pid), enriched_text, metadata)])
+            
+            # Create namespaced ID: {type}:{id}
+            vector_id = f"{record_type}:{record['id']}"
+            
+            # Upsert to vector DB
+            await asyncio.to_thread(index.upsert, [(str(vector_id), enriched_text, metadata)])
             upserted += 1
+            
+            print(f"✅ Upserted {vector_id}: {record.get('title', 'untitled')[:50]}...")
+            
         except Exception as e:
-            errors.append({'id': item.get('id') if isinstance(item, dict) else None, 'error': str(e)})
+            error_msg = {'id': record.get('id'), 'type': record.get('type'), 'error': str(e)}
+            errors.append(error_msg)
+            print(f"❌ Error upserting {record.get('id')}: {str(e)}")
 
     return {
         'total': total,
@@ -115,6 +154,11 @@ async def migrate_projects_async():
     }
 
 
-def migrate_projects():
+def migrate_records():
     """Synchronous wrapper for CLI usage."""
-    return asyncio.run(migrate_projects_async())
+    return asyncio.run(migrate_records_async())
+
+
+# Backward compatibility aliases
+migrate_projects_async = migrate_records_async
+migrate_projects = migrate_records
