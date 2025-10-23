@@ -414,6 +414,10 @@
             z-index: 1000;
         }
 
+        .modal.hidden {
+            display: none;
+        }
+
         .modal-content {
             background: hsl(var(--card));
             border-radius: var(--radius);
@@ -596,11 +600,10 @@
                                 <th>Tags</th>
                                 <th>Priority</th>
                                 <th>Dates</th>
-                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="recordsBody">
-                            <tr><td colspan="7" style="text-align: center; padding: 40px; color: hsl(var(--muted-foreground));">Loading records...</td></tr>
+                            <tr><td colspan="6" style="text-align: center; padding: 40px; color: hsl(var(--muted-foreground));">Loading records...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -612,7 +615,7 @@
     <div id="editModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="modalTitle">View Record</h2>
+                <h2 id="modalTitle">Edit Record</h2>
                 <button class="close-btn" onclick="closeEditModal()">&times;</button>
             </div>
             
@@ -731,7 +734,7 @@
 
         async function loadRecords() {
             const tbody = document.getElementById('recordsBody');
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Loading...</td></tr>';
 
             try {
                 const response = await fetch('/api/admin/records', {
@@ -750,7 +753,7 @@
                     document.getElementById('statTotal').textContent = data.count;
 
                     if (records.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: hsl(var(--muted-foreground));">No records found. Click "Add Record" to create one.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: hsl(var(--muted-foreground));">No records found. Click "Add Record" to create one.</td></tr>';
                         return;
                     }
 
@@ -765,16 +768,12 @@
                                 <td>${typeBadge}</td>
                                 <td><code>${r.id}</code></td>
                                 <td>
-                                    <div style="font-weight: 500;">${r.title}</div>
+                                    <div style="font-weight: 500; cursor: pointer; color: hsl(var(--primary));" onclick="editRecord('${r.id}')">${r.title}</div>
                                     ${r.summary ? `<div style="font-size: 0.8125rem; color: hsl(var(--muted-foreground)); margin-top: 4px;">${r.summary.substring(0, 100)}${r.summary.length > 100 ? '...' : ''}</div>` : ''}
                                 </td>
                                 <td style="font-size: 0.8125rem;">${tags}</td>
                                 <td>${priorityBadge}</td>
                                 <td style="font-size: 0.8125rem; color: hsl(var(--muted-foreground));">${dates}</td>
-                                <td class="action-cell">
-                                    <button class="ghost" onclick="viewRecord('${r.id}')">View</button>
-                                    <button class="secondary" onclick="editRecord('${r.id}')">Edit</button>
-                                </td>
                             </tr>
                         `;
                     }).join('');
@@ -949,18 +948,10 @@
             }
         }
 
-        // Edit/View modal functions
+        // Edit modal functions
         let currentEditId = '';
 
-        async function viewRecord(id) {
-            await openRecordModal(id, true);
-        }
-
         async function editRecord(id) {
-            await openRecordModal(id, false);
-        }
-
-        async function openRecordModal(id, viewOnly = false) {
             currentEditId = id;
             
             try {
@@ -994,9 +985,9 @@
                         const row = document.createElement('div');
                         row.className = 'additional-url-row';
                         row.innerHTML = `
-                            <input type="text" value="${label}" class="url-label" style="width: 30%; margin-right: 8px;" ${viewOnly ? 'readonly' : ''} />
-                            <input type="text" value="${url}" class="url-value" style="width: 60%; margin-right: 8px;" ${viewOnly ? 'readonly' : ''} />
-                            <button type="button" class="ghost" onclick="removeEditUrlRow(this)" style="width: 10%; padding: 10px 8px;" ${viewOnly ? 'disabled' : ''}>×</button>
+                            <input type="text" value="${label}" class="url-label" style="width: 30%; margin-right: 8px;" />
+                            <input type="text" value="${url}" class="url-value" style="width: 60%; margin-right: 8px;" />
+                            <button type="button" class="ghost" onclick="removeEditUrlRow(this)" style="width: 10%; padding: 10px 8px;">×</button>
                         `;
                         urlContainer.appendChild(row);
                     });
@@ -1005,28 +996,12 @@
                     const row = document.createElement('div');
                     row.className = 'additional-url-row';
                     row.innerHTML = `
-                        <input type="text" placeholder="Label (e.g., Demo, Documentation)" class="url-label" style="width: 30%; margin-right: 8px;" ${viewOnly ? 'readonly' : ''} />
-                        <input type="text" placeholder="https://..." class="url-value" style="width: 60%; margin-right: 8px;" ${viewOnly ? 'readonly' : ''} />
-                        <button type="button" class="ghost" onclick="removeEditUrlRow(this)" style="width: 10%; padding: 10px 8px;" ${viewOnly ? 'disabled' : ''}>×</button>
+                        <input type="text" placeholder="Label (e.g., Demo, Documentation)" class="url-label" style="width: 30%; margin-right: 8px;" />
+                        <input type="text" placeholder="https://..." class="url-value" style="width: 60%; margin-right: 8px;" />
+                        <button type="button" class="ghost" onclick="removeEditUrlRow(this)" style="width: 10%; padding: 10px 8px;">×</button>
                     `;
                     urlContainer.appendChild(row);
                 }
-
-                // Set modal title and form state
-                document.getElementById('modalTitle').textContent = viewOnly ? 'View Record' : 'Edit Record';
-                
-                // Disable/enable form elements for view mode
-                const formElements = document.querySelectorAll('#editForm input, #editForm select, #editForm textarea');
-                formElements.forEach(el => {
-                    if (el.id !== 'editId') { // ID is always readonly
-                        el.readOnly = viewOnly;
-                        el.disabled = viewOnly;
-                    }
-                });
-
-                // Show/hide action buttons
-                document.getElementById('saveBtn').style.display = viewOnly ? 'none' : 'inline-flex';
-                document.getElementById('deleteBtn').style.display = viewOnly ? 'none' : 'inline-flex';
 
                 // Show modal
                 document.getElementById('editModal').classList.remove('hidden');

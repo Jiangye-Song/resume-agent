@@ -3,6 +3,7 @@ import asyncio
 import os
 import hashlib
 import asyncpg
+from datetime import date
 
 app = Flask(__name__, static_folder='frontend', static_url_path='')
 
@@ -72,6 +73,20 @@ def chat():
 def hash_password(password: str) -> str:
     """Hash password using SHA-256."""
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+
+def parse_date(date_str):
+    """Parse date string to date object, return None if empty or invalid."""
+    if not date_str or date_str.strip() == '':
+        return None
+    try:
+        # Parse YYYY-MM-DD format
+        parts = date_str.strip().split('-')
+        if len(parts) == 3:
+            return date(int(parts[0]), int(parts[1]), int(parts[2]))
+        return None
+    except (ValueError, AttributeError):
+        return None
 
 
 async def verify_password_async(password: str) -> bool:
@@ -195,10 +210,19 @@ def admin_records():
                         except:
                             additional_url = []
                     
+                    # Handle date fields - convert empty strings to None
+                    start_date = record.get('start_date')
+                    if start_date == '' or start_date == 'null':
+                        start_date = None
+                    
+                    end_date = record.get('end_date')
+                    if end_date == '' or end_date == 'null':
+                        end_date = None
+                    
                     await conn.execute('''
                         INSERT INTO records (id, type, title, summary, tags, detail_site, 
                                            additional_url, start_date, end_date, priority)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date, $9::date, $10)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                     ''', 
                         record['id'],
                         record['type'],
@@ -207,8 +231,8 @@ def admin_records():
                         record.get('tags', []),
                         record.get('detail_site'),
                         additional_url,
-                        record.get('start_date'),
-                        record.get('end_date'),
+                        parse_date(record.get('start_date')),
+                        parse_date(record.get('end_date')),
                         record.get('priority', 3)
                     )
                     
@@ -306,10 +330,19 @@ def admin_record_detail(record_id):
                         except:
                             additional_url = []
                     
+                    # Handle date fields - convert empty strings to None
+                    start_date = record.get('start_date')
+                    if start_date == '' or start_date == 'null':
+                        start_date = None
+                    
+                    end_date = record.get('end_date')
+                    if end_date == '' or end_date == 'null':
+                        end_date = None
+                    
                     result = await conn.execute('''
                         UPDATE records 
                         SET type = $2, title = $3, summary = $4, tags = $5, detail_site = $6,
-                            additional_url = $7, start_date = $8::date, end_date = $9::date, priority = $10
+                            additional_url = $7, start_date = $8, end_date = $9, priority = $10
                         WHERE id = $1
                     ''', 
                         record_id,
@@ -319,8 +352,8 @@ def admin_record_detail(record_id):
                         record.get('tags', []),
                         record.get('detail_site'),
                         additional_url,
-                        record.get('start_date'),
-                        record.get('end_date'),
+                        parse_date(record.get('start_date')),
+                        parse_date(record.get('end_date')),
                         record.get('priority', 3)
                     )
                     
