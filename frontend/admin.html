@@ -114,6 +114,11 @@
             color: hsl(var(--muted-foreground));
         }
 
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
         button {
             display: inline-flex;
             align-items: center;
@@ -463,6 +468,47 @@
             padding: 6px 12px;
             font-size: 0.75rem;
         }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid hsl(var(--primary-foreground) / 0.3);
+            border-top-color: hsl(var(--primary-foreground));
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: hsl(var(--card) / 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius);
+            z-index: 10;
+        }
+
+        .loading-overlay .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid hsl(var(--border));
+            border-top-color: hsl(var(--primary));
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .modal-content {
+            position: relative;
+        }
     </style>
 </head>
 <body>
@@ -644,7 +690,7 @@
                         </div>
                         <div class="form-full">
                             <label for="editSummary">Summary</label>
-                            <textarea id="editSummary" rows="4"></textarea>
+                            <textarea id="editSummary" rows="8"></textarea>
                         </div>
                     </div>
                 </div>
@@ -817,6 +863,11 @@
         }
 
         async function createRecord() {
+            const createBtn = event.target || document.querySelector('#addForm button.primary');
+            const originalText = createBtn.innerHTML;
+            createBtn.disabled = true;
+            createBtn.innerHTML = '<span class="loading-spinner"></span> Creating...';
+
             // Collect additional URLs
             const additionalUrls = [];
             const urlRows = document.querySelectorAll('#additionalUrlsContainer .additional-url-row');
@@ -842,6 +893,8 @@
             };
 
             if (!record.id || !record.title) {
+                createBtn.disabled = false;
+                createBtn.innerHTML = originalText;
                 showMessage('ID and Title are required', 'error');
                 return;
             }
@@ -861,12 +914,18 @@
 
                 if (data.status === 'ok') {
                     showMessage(`Record "${record.id}" created successfully`, 'success');
+                    createBtn.disabled = false;
+                    createBtn.innerHTML = originalText;
                     hideAddForm();
                     loadRecords();
                 } else {
+                    createBtn.disabled = false;
+                    createBtn.innerHTML = originalText;
                     showMessage(data.message, 'error');
                 }
             } catch (error) {
+                createBtn.disabled = false;
+                createBtn.innerHTML = originalText;
                 showMessage('Error creating record: ' + error.message, 'error');
             }
         }
@@ -954,9 +1013,20 @@
         async function editRecord(id) {
             currentEditId = id;
             
+            // Show modal immediately with loading state
+            document.getElementById('editModal').classList.remove('hidden');
+            const modalContent = document.querySelector('.modal-content');
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.className = 'loading-overlay';
+            loadingOverlay.innerHTML = '<div class="spinner"></div>';
+            modalContent.appendChild(loadingOverlay);
+            
             try {
                 const response = await fetch(`/api/admin/records/${id}?password=${encodeURIComponent(sessionPassword)}`);
                 const data = await response.json();
+                
+                // Remove loading overlay
+                loadingOverlay.remove();
 
                 if (data.status !== 'ok') {
                     showMessage(data.message, 'error');
@@ -1002,11 +1072,10 @@
                     `;
                     urlContainer.appendChild(row);
                 }
-
-                // Show modal
-                document.getElementById('editModal').classList.remove('hidden');
                 
             } catch (error) {
+                loadingOverlay.remove();
+                closeEditModal();
                 showMessage('Error loading record: ' + error.message, 'error');
             }
         }
@@ -1018,6 +1087,11 @@
 
         async function saveRecord() {
             if (!currentEditId) return;
+
+            const saveBtn = document.getElementById('saveBtn');
+            const originalText = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="loading-spinner"></span> Saving...';
 
             // Collect additional URLs
             const additionalUrls = [];
@@ -1064,9 +1138,13 @@
                     closeEditModal();
                     loadRecords();
                 } else {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalText;
                     showMessage(data.message, 'error');
                 }
             } catch (error) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
                 showMessage('Error updating record: ' + error.message, 'error');
             }
         }
@@ -1077,6 +1155,11 @@
             if (!confirm(`Are you sure you want to delete record "${currentEditId}"? This action cannot be undone.`)) {
                 return;
             }
+
+            const deleteBtn = document.getElementById('deleteBtn');
+            const originalText = deleteBtn.innerHTML;
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = '<span class="loading-spinner"></span> Deleting...';
 
             try {
                 const response = await fetch(`/api/admin/records/${currentEditId}`, {
@@ -1092,9 +1175,13 @@
                     closeEditModal();
                     loadRecords();
                 } else {
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerHTML = originalText;
                     showMessage(data.message, 'error');
                 }
             } catch (error) {
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = originalText;
                 showMessage('Error deleting record: ' + error.message, 'error');
             }
         }

@@ -142,3 +142,7 @@ header h1 {
 .suggestion-btn:active {
     transform: translateY(0);
 }
+
+textarea {
+  resize: vertical;
+}
