@@ -1013,6 +1013,14 @@
         async function editRecord(id) {
             currentEditId = id;
             
+            // Reset button states
+            const saveBtn = document.getElementById('saveBtn');
+            const deleteBtn = document.getElementById('deleteBtn');
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = 'Save Changes';
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = 'Delete';
+            
             // Show modal immediately with loading state
             document.getElementById('editModal').classList.remove('hidden');
             const modalContent = document.querySelector('.modal-content');
@@ -1135,6 +1143,8 @@
 
                 if (data.status === 'ok') {
                     showMessage(`Record "${currentEditId}" updated successfully`, 'success');
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalText;
                     closeEditModal();
                     loadRecords();
                 } else {
@@ -1172,6 +1182,8 @@
 
                 if (data.status === 'ok') {
                     showMessage(`Record "${currentEditId}" deleted successfully`, 'success');
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerHTML = originalText;
                     closeEditModal();
                     loadRecords();
                 } else {
