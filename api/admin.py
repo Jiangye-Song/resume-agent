@@ -56,6 +56,7 @@ async def verify_password(password: str) -> bool:
 @app.post('/')
 async def verify_auth(request: Request):
     """Verify password for admin access."""
+    print(f"[admin] POST / called - path: {request.url.path}, full url: {request.url}")
     try:
         body = await request.json()
         password = body.get('password', '')
@@ -65,6 +66,7 @@ async def verify_auth(request: Request):
         else:
             return JSONResponse({'status': 'error', 'message': 'Invalid password'}, status_code=401)
     except Exception as e:
+        print(f"[admin] Error in verify_auth: {e}")
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
 
 
