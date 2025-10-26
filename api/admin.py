@@ -13,6 +13,7 @@ import os
 import asyncio
 import asyncpg
 import hashlib
+from datetime import date, datetime
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
@@ -21,6 +22,17 @@ from migrate_utils import migrate_records_async
 load_dotenv()
 
 app = FastAPI()
+
+
+def parse_date(date_str):
+    """Parse a date string to a Python date object, or return None."""
+    if not date_str or date_str == '':
+        return None
+    try:
+        # Try parsing ISO format: YYYY-MM-DD
+        return datetime.strptime(date_str, '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        return None
 
 
 def hash_password(password: str) -> str:
@@ -153,6 +165,10 @@ async def list_or_create_records(request: Request):
                     end_date = None
                 
                 print(f"[admin] Dates - start: {start_date}, end: {end_date}")
+                
+                # Convert date strings to date objects for asyncpg
+                start_date = parse_date(start_date) if start_date else None
+                end_date = parse_date(end_date) if end_date else None
                 
                 await conn.execute('''
                     INSERT INTO records (id, type, title, summary, tags, detail_site, 
@@ -465,6 +481,10 @@ async def put_catch_all(request: Request, path_name: str):
                 end_date = record.get('end_date')
                 if end_date == '':
                     end_date = None
+                
+                # Convert date strings to date objects for asyncpg
+                start_date = parse_date(start_date) if start_date else None
+                end_date = parse_date(end_date) if end_date else None
                 
                 await conn.execute('''
                     UPDATE records
