@@ -1202,6 +1202,40 @@
         document.getElementById('loginPassword')?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') login();
         });
+
+        // Auto-generate ID from title
+        function generateIdFromTitle(title) {
+            return title
+                .toLowerCase()
+                .trim()
+                .replace(/[^\w\s-]/g, '') // Remove special characters
+                .replace(/\s+/g, '-')     // Replace spaces with hyphens
+                .replace(/-+/g, '-')      // Replace multiple hyphens with single hyphen
+                .substring(0, 50);        // Limit length
+        }
+
+        // Track if ID was manually edited
+        let idManuallyEdited = false;
+
+        // Add event listeners for auto-generating ID from title
+        document.getElementById('newTitle')?.addEventListener('input', (e) => {
+            if (!idManuallyEdited) {
+                const idInput = document.getElementById('newId');
+                idInput.value = generateIdFromTitle(e.target.value);
+            }
+        });
+
+        // Track when ID is manually edited
+        document.getElementById('newId')?.addEventListener('input', () => {
+            idManuallyEdited = true;
+        });
+
+        // Reset manual edit flag when form is cleared
+        const originalHideAddForm = hideAddForm;
+        hideAddForm = function() {
+            idManuallyEdited = false;
+            originalHideAddForm();
+        };
     </script>
 </body>
 </html>
