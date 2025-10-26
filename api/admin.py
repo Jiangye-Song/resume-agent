@@ -332,14 +332,170 @@ async def health_check():
 async def post_catch_all(request: Request, path_name: str):
     """Catch-all POST route for debugging."""
     print(f"[admin] POST catch-all: path={path_name}")
-    # If path is empty, it's the root - handle as verify_auth
-    if not path_name or path_name == '':
+    
+    # Handle /api/admin path (Vercel passes full path)
+    if path_name == 'api/admin' or not path_name or path_name == '':
         return await verify_auth(request)
+    
+    # Handle /api/admin/records
+    if path_name == 'api/admin/records':
+        return await list_or_create_records(request)
+    
+    # Handle /api/admin/upsert-all
+    if path_name == 'api/admin/upsert-all':
+        return await upsert_all_records(request)
+    
     return JSONResponse({'error': f'Unknown POST endpoint: {path_name}'}, status_code=404)
 
 
 @app.get('/{path_name:path}')
-async def get_catch_all(path_name: str):
+async def get_catch_all(request: Request, path_name: str):
     """Catch-all GET route for debugging."""
     print(f"[admin] GET catch-all: path={path_name}")
+    
+    # Handle GET /api/admin/records/{id} with password query param
+    if path_name.startswith('api/admin/records/'):
+        record_id = path_name.split('/')[-1]
+        password = request.query_params.get('password', '')
+        
+        # Verify password
+        if not await verify_password(password):
+            return JSONResponse({'status': 'error', 'message': 'Invalid password'}, status_code=401)
+        
+        # Get the record (extract logic from get_record endpoint)
+        DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
+        if not DATABASE_URL:
+            return JSONResponse({'status': 'error', 'message': 'Database not configured'}, status_code=500)
+        
+        try:
+            conn = await asyncpg.connect(DATABASE_URL)
+            try:
+                row = await conn.fetchrow('''
+                    SELECT id, type, title, summary, tags, detail_site, additional_url,
+                           start_date, end_date, priority
+                    FROM records
+                    WHERE id = $1
+                ''', record_id)
+                
+                if not row:
+                    return JSONResponse({'status': 'error', 'message': 'Record not found'}, status_code=404)
+                
+                record = {
+                    'id': row['id'],
+                    'type': row['type'],
+                    'title': row['title'],
+                    'summary': row['summary'],
+                    'tags': list(row['tags']) if row['tags'] else [],
+                    'detail_site': row['detail_site'],
+                    'additional_url': row['additional_url'] if row['additional_url'] else [],
+                    'start_date': row['start_date'].isoformat() if row['start_date'] else None,
+                    'end_date': row['end_date'].isoformat() if row['end_date'] else None,
+                    'priority': row['priority']
+                }
+                
+                return JSONResponse({'status': 'ok', 'record': record})
+            finally:
+                await conn.close()
+        except Exception as e:
+            return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+    
     return JSONResponse({'error': f'Unknown GET endpoint: {path_name}'}, status_code=404)
+
+
+@app.put('/{path_name:path}')
+async def put_catch_all(request: Request, path_name: str):
+    """Catch-all PUT route."""
+    print(f"[admin] PUT catch-all: path={path_name}")
+    
+    # Handle PUT /api/admin/records/{id}
+    if path_name.startswith('api/admin/records/'):
+        record_id = path_name.split('/')[-1]
+        body = await request.json()
+        password = body.get('password', '')
+        
+        # Verify password
+        if not await verify_password(password):
+            return JSONResponse({'status': 'error', 'message': 'Invalid password'}, status_code=401)
+        
+        DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
+        if not DATABASE_URL:
+            return JSONResponse({'status': 'error', 'message': 'Database not configured'}, status_code=500)
+        
+        record = body.get('record', {})
+        
+        # Validate required fields
+        if not record.get('type') or not record.get('title'):
+            return JSONResponse({
+                'status': 'error', 
+                'message': 'Missing required fields: type, title'
+            }, status_code=400)
+        
+        try:
+            conn = await asyncpg.connect(DATABASE_URL)
+            try:
+                # Parse additional_url if it's a string
+                additional_url = record.get('additional_url', [])
+                if isinstance(additional_url, str):
+                    import json
+                    try:
+                        additional_url = json.loads(additional_url)
+                    except:
+                        additional_url = []
+                
+                await conn.execute('''
+                    UPDATE records
+                    SET type = $1, title = $2, summary = $3, tags = $4, detail_site = $5,
+                        additional_url = $6, start_date = $7::date, end_date = $8::date, priority = $9
+                    WHERE id = $10
+                ''', 
+                    record['type'],
+                    record['title'],
+                    record.get('summary'),
+                    record.get('tags', []),
+                    record.get('detail_site'),
+                    additional_url,
+                    record.get('start_date'),
+                    record.get('end_date'),
+                    record.get('priority', 3),
+                    record_id
+                )
+                
+                return JSONResponse({'status': 'ok', 'message': 'Record updated successfully', 'id': record_id})
+            finally:
+                await conn.close()
+        except Exception as e:
+            return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+    
+    return JSONResponse({'error': f'Unknown PUT endpoint: {path_name}'}, status_code=404)
+
+
+@app.delete('/{path_name:path}')
+async def delete_catch_all(request: Request, path_name: str):
+    """Catch-all DELETE route."""
+    print(f"[admin] DELETE catch-all: path={path_name}")
+    
+    # Handle DELETE /api/admin/records/{id}
+    if path_name.startswith('api/admin/records/'):
+        record_id = path_name.split('/')[-1]
+        body = await request.json()
+        password = body.get('password', '')
+        
+        # Verify password
+        if not await verify_password(password):
+            return JSONResponse({'status': 'error', 'message': 'Invalid password'}, status_code=401)
+        
+        DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
+        if not DATABASE_URL:
+            return JSONResponse({'status': 'error', 'message': 'Database not configured'}, status_code=500)
+        
+        try:
+            conn = await asyncpg.connect(DATABASE_URL)
+            try:
+                await conn.execute('DELETE FROM records WHERE id = $1', record_id)
+                return JSONResponse({'status': 'ok', 'message': 'Record deleted successfully', 'id': record_id})
+            finally:
+                await conn.close()
+        except Exception as e:
+            return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+    
+    return JSONResponse({'error': f'Unknown DELETE endpoint: {path_name}'}, status_code=404)
