@@ -122,6 +122,8 @@ async def list_or_create_records(request: Request):
         # Create new record
         record = body.get('record', {})
         
+        print(f"[admin] Creating record: {record.get('id')}")
+        
         # Validate required fields
         if not record.get('id') or not record.get('type') or not record.get('title'):
             return JSONResponse({
@@ -150,6 +152,8 @@ async def list_or_create_records(request: Request):
                 if end_date == '':
                     end_date = None
                 
+                print(f"[admin] Dates - start: {start_date}, end: {end_date}")
+                
                 await conn.execute('''
                     INSERT INTO records (id, type, title, summary, tags, detail_site, 
                                        additional_url, start_date, end_date, priority)
@@ -171,6 +175,10 @@ async def list_or_create_records(request: Request):
             finally:
                 await conn.close()
         except Exception as e:
+            import traceback
+            error_detail = traceback.format_exc()
+            print(f"[admin] Error creating record: {e}")
+            print(f"[admin] Traceback: {error_detail}")
             return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
     
     else:
