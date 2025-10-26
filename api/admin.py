@@ -3,8 +3,10 @@ Admin API endpoints for managing records.
 
 Endpoints:
 - POST /api/admin (root) - Verify password
-- GET /api/admin/records - List all records
-- POST /api/admin/records - Create new record
+- POST /api/admin/records - List all records (action='list') or Create new record (action='create')
+- GET /api/admin/records/{record_id} - Get a single record by ID
+- PUT /api/admin/records/{record_id} - Update an existing record
+- DELETE /api/admin/records/{record_id} - Delete a record
 - POST /api/admin/upsert-all - Trigger upsert of all records to vector DB
 """
 import os
@@ -163,6 +165,135 @@ async def list_or_create_records(request: Request):
     
     else:
         return JSONResponse({'status': 'error', 'message': 'Invalid action'}, status_code=400)
+
+
+@app.get('/records/{record_id}')
+async def get_record(record_id: str, password: str = ''):
+    """Get a single record by ID."""
+    # Verify password
+    if not await verify_password(password):
+        return JSONResponse({'status': 'error', 'message': 'Invalid password'}, status_code=401)
+    
+    DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
+    if not DATABASE_URL:
+        return JSONResponse({'status': 'error', 'message': 'Database not configured'}, status_code=500)
+    
+    try:
+        conn = await asyncpg.connect(DATABASE_URL)
+        try:
+            row = await conn.fetchrow('''
+                SELECT id, type, title, summary, tags, detail_site, additional_url,
+                       start_date, end_date, priority
+                FROM records
+                WHERE id = $1
+            ''', record_id)
+            
+            if not row:
+                return JSONResponse({'status': 'error', 'message': 'Record not found'}, status_code=404)
+            
+            record = {
+                'id': row['id'],
+                'type': row['type'],
+                'title': row['title'],
+                'summary': row['summary'],
+                'tags': list(row['tags']) if row['tags'] else [],
+                'detail_site': row['detail_site'],
+                'additional_url': row['additional_url'] if row['additional_url'] else [],
+                'start_date': row['start_date'].isoformat() if row['start_date'] else None,
+                'end_date': row['end_date'].isoformat() if row['end_date'] else None,
+                'priority': row['priority']
+            }
+            
+            return JSONResponse({'status': 'ok', 'record': record})
+        finally:
+            await conn.close()
+    except Exception as e:
+        return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+
+
+@app.put('/records/{record_id}')
+async def update_record(record_id: str, request: Request):
+    """Update an existing record."""
+    body = await request.json()
+    password = body.get('password', '')
+    
+    # Verify password
+    if not await verify_password(password):
+        return JSONResponse({'status': 'error', 'message': 'Invalid password'}, status_code=401)
+    
+    DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
+    if not DATABASE_URL:
+        return JSONResponse({'status': 'error', 'message': 'Database not configured'}, status_code=500)
+    
+    record = body.get('record', {})
+    
+    # Validate required fields
+    if not record.get('type') or not record.get('title'):
+        return JSONResponse({
+            'status': 'error', 
+            'message': 'Missing required fields: type, title'
+        }, status_code=400)
+    
+    try:
+        conn = await asyncpg.connect(DATABASE_URL)
+        try:
+            # Parse additional_url if it's a string
+            additional_url = record.get('additional_url', [])
+            if isinstance(additional_url, str):
+                import json
+                try:
+                    additional_url = json.loads(additional_url)
+                except:
+                    additional_url = []
+            
+            await conn.execute('''
+                UPDATE records
+                SET type = $1, title = $2, summary = $3, tags = $4, detail_site = $5,
+                    additional_url = $6, start_date = $7::date, end_date = $8::date, priority = $9
+                WHERE id = $10
+            ''', 
+                record['type'],
+                record['title'],
+                record.get('summary'),
+                record.get('tags', []),
+                record.get('detail_site'),
+                additional_url,
+                record.get('start_date'),
+                record.get('end_date'),
+                record.get('priority', 3),
+                record_id
+            )
+            
+            return JSONResponse({'status': 'ok', 'message': 'Record updated successfully', 'id': record_id})
+        finally:
+            await conn.close()
+    except Exception as e:
+        return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+
+
+@app.delete('/records/{record_id}')
+async def delete_record(record_id: str, request: Request):
+    """Delete a record."""
+    body = await request.json()
+    password = body.get('password', '')
+    
+    # Verify password
+    if not await verify_password(password):
+        return JSONResponse({'status': 'error', 'message': 'Invalid password'}, status_code=401)
+    
+    DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
+    if not DATABASE_URL:
+        return JSONResponse({'status': 'error', 'message': 'Database not configured'}, status_code=500)
+    
+    try:
+        conn = await asyncpg.connect(DATABASE_URL)
+        try:
+            await conn.execute('DELETE FROM records WHERE id = $1', record_id)
+            return JSONResponse({'status': 'ok', 'message': 'Record deleted successfully', 'id': record_id})
+        finally:
+            await conn.close()
+    except Exception as e:
+        return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
 
 
 @app.post('/upsert-all')
