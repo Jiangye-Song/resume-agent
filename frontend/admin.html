@@ -1256,6 +1256,30 @@
             detailSiteManuallyEdited = false;
             originalHideAddForm();
         };
+
+        // Clean up tags input - remove brackets, quotes, and normalize spaces
+        function cleanTagsInput(value) {
+            return value
+                .replace(/[\[\]"']/g, '')     // Remove brackets and quotes
+                .replace(/\s+/g, ' ')          // Replace multiple spaces with single space
+                .trim();
+        }
+
+        // Add event listeners for tags cleanup on both new and edit forms
+        function setupTagsCleanup(inputId) {
+            const input = document.getElementById(inputId);
+            if (input) {
+                input.addEventListener('blur', (e) => {
+                    e.target.value = cleanTagsInput(e.target.value);
+                });
+                input.addEventListener('input', (e) => {
+                    e.target.value = cleanTagsInput(e.target.value);
+                });
+            }
+        }
+
+        setupTagsCleanup('newTags');
+        setupTagsCleanup('editTags');
     </script>
 </body>
 </html>
