@@ -13,7 +13,6 @@ import os
 import asyncio
 import asyncpg
 import hashlib
-import re
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
@@ -316,8 +315,3 @@ async def upsert_all_records(request: Request):
         })
     except Exception as e:
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
-
-
-# Vercel serverless function handler - must be at the end after all routes
-from mangum import Mangum
-handler = Mangum(app)
