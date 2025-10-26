@@ -581,7 +581,7 @@
                             </div>
                             <div class="form-full">
                                 <label for="newDetailSite">Detail Site URL</label>
-                                <input type="text" id="newDetailSite" placeholder="https://github.com/..." />
+                                <input type="text" id="newDetailSite" placeholder="https://cv.jy-s.com/..." />
                             </div>
                             <div class="form-full">
                                 <label>Additional URLs</label>
@@ -1216,24 +1216,44 @@
 
         // Track if ID was manually edited
         let idManuallyEdited = false;
+        let detailSiteManuallyEdited = false;
 
         // Add event listeners for auto-generating ID from title
         document.getElementById('newTitle')?.addEventListener('input', (e) => {
+            const generatedId = generateIdFromTitle(e.target.value);
+            
             if (!idManuallyEdited) {
                 const idInput = document.getElementById('newId');
-                idInput.value = generateIdFromTitle(e.target.value);
+                idInput.value = generatedId;
+            }
+            
+            if (!detailSiteManuallyEdited && generatedId) {
+                const detailSiteInput = document.getElementById('newDetailSite');
+                detailSiteInput.value = `https://cv.jy-s.com/${generatedId}`;
             }
         });
 
         // Track when ID is manually edited
-        document.getElementById('newId')?.addEventListener('input', () => {
+        document.getElementById('newId')?.addEventListener('input', (e) => {
             idManuallyEdited = true;
+            
+            // Update detail site URL if it hasn't been manually edited
+            if (!detailSiteManuallyEdited && e.target.value) {
+                const detailSiteInput = document.getElementById('newDetailSite');
+                detailSiteInput.value = `https://cv.jy-s.com/${e.target.value}`;
+            }
+        });
+
+        // Track when Detail Site URL is manually edited
+        document.getElementById('newDetailSite')?.addEventListener('input', () => {
+            detailSiteManuallyEdited = true;
         });
 
         // Reset manual edit flag when form is cleared
         const originalHideAddForm = hideAddForm;
         hideAddForm = function() {
             idManuallyEdited = false;
+            detailSiteManuallyEdited = false;
             originalHideAddForm();
         };
     </script>
