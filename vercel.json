@@ -8,7 +8,9 @@
 		{ "src": "frontend/**", "use": "@vercel/static" }
 	],
 	"routes": [
-		{ "src": "/api/admin/(.*)", "dest": "/api/admin.py" },
+		{ "src": "/api/admin/records/([^/]+)", "dest": "/api/admin.py" },
+		{ "src": "/api/admin/records", "dest": "/api/admin.py" },
+		{ "src": "/api/admin/upsert-all", "dest": "/api/admin.py" },
 		{ "src": "/api/admin", "dest": "/api/admin.py" },
 		{ "src": "/api/chat", "dest": "/api/chat.py" },
 		{ "src": "/api/hello", "dest": "/api/hello.py" },

@@ -317,3 +317,29 @@ async def upsert_all_records(request: Request):
         })
     except Exception as e:
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+
+
+# Health check / debugging route
+@app.get('/')
+async def health_check():
+    """Health check endpoint."""
+    print(f"[admin] GET / health check called")
+    return JSONResponse({'status': 'ok', 'service': 'admin'})
+
+
+# Catch-all for debugging - must be last
+@app.post('/{path_name:path}')
+async def post_catch_all(request: Request, path_name: str):
+    """Catch-all POST route for debugging."""
+    print(f"[admin] POST catch-all: path={path_name}")
+    # If path is empty, it's the root - handle as verify_auth
+    if not path_name or path_name == '':
+        return await verify_auth(request)
+    return JSONResponse({'error': f'Unknown POST endpoint: {path_name}'}, status_code=404)
+
+
+@app.get('/{path_name:path}')
+async def get_catch_all(path_name: str):
+    """Catch-all GET route for debugging."""
+    print(f"[admin] GET catch-all: path={path_name}")
+    return JSONResponse({'error': f'Unknown GET endpoint: {path_name}'}, status_code=404)
