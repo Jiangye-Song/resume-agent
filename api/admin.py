@@ -13,6 +13,7 @@ import os
 import asyncio
 import asyncpg
 import hashlib
+import re
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
@@ -21,6 +22,10 @@ from migrate_utils import migrate_records_async
 load_dotenv()
 
 app = FastAPI()
+
+# Vercel serverless function handler
+from mangum import Mangum
+handler = Mangum(app)
 
 
 def hash_password(password: str) -> str:

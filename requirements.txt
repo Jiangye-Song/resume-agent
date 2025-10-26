@@ -6,3 +6,4 @@ Flask
 asyncpg
 fastapi
 uvicorn
+mangum

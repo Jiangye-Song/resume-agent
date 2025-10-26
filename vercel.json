@@ -5,8 +5,10 @@
 		{ "src": "frontend/**", "use": "@vercel/static" }
 	],
 	"routes": [
-		{ "src": "/api/admin/(.*)", "dest": "/api/admin.py" },
-		{ "src": "/api/admin", "dest": "/api/admin.py" },
+		{ "src": "/api/admin/records/(.*)", "dest": "/api/admin" },
+		{ "src": "/api/admin/records", "dest": "/api/admin" },
+		{ "src": "/api/admin/upsert-all", "dest": "/api/admin" },
+		{ "src": "/api/admin", "dest": "/api/admin" },
 		{ "src": "/api/chat", "dest": "/api/chat.py" },
 		{ "src": "/api/(.*)", "dest": "/api/$1" },
 		{ "src": "^/$", "dest": "/frontend/index.html" },
