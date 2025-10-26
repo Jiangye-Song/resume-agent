@@ -142,10 +142,18 @@ async def list_or_create_records(request: Request):
                     except:
                         additional_url = []
                 
+                # Convert empty date strings to None
+                start_date = record.get('start_date')
+                if start_date == '':
+                    start_date = None
+                end_date = record.get('end_date')
+                if end_date == '':
+                    end_date = None
+                
                 await conn.execute('''
                     INSERT INTO records (id, type, title, summary, tags, detail_site, 
                                        additional_url, start_date, end_date, priority)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date, $9::date, $10)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 ''', 
                     record['id'],
                     record['type'],
@@ -154,8 +162,8 @@ async def list_or_create_records(request: Request):
                     record.get('tags', []),
                     record.get('detail_site'),
                     additional_url,
-                    record.get('start_date'),
-                    record.get('end_date'),
+                    start_date,
+                    end_date,
                     record.get('priority', 3)
                 )
                 
@@ -442,10 +450,18 @@ async def put_catch_all(request: Request, path_name: str):
                     except:
                         additional_url = []
                 
+                # Convert empty date strings to None
+                start_date = record.get('start_date')
+                if start_date == '':
+                    start_date = None
+                end_date = record.get('end_date')
+                if end_date == '':
+                    end_date = None
+                
                 await conn.execute('''
                     UPDATE records
                     SET type = $1, title = $2, summary = $3, tags = $4, detail_site = $5,
-                        additional_url = $6, start_date = $7::date, end_date = $8::date, priority = $9
+                        additional_url = $6, start_date = $7, end_date = $8, priority = $9
                     WHERE id = $10
                 ''', 
                     record['type'],
@@ -454,8 +470,8 @@ async def put_catch_all(request: Request, path_name: str):
                     record.get('tags', []),
                     record.get('detail_site'),
                     additional_url,
-                    record.get('start_date'),
-                    record.get('end_date'),
+                    start_date,
+                    end_date,
                     record.get('priority', 3),
                     record_id
                 )
