@@ -23,10 +23,6 @@ load_dotenv()
 
 app = FastAPI()
 
-# Vercel serverless function handler
-from mangum import Mangum
-handler = Mangum(app)
-
 
 def hash_password(password: str) -> str:
     """Hash password using SHA-256."""
@@ -320,3 +316,8 @@ async def upsert_all_records(request: Request):
         })
     except Exception as e:
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+
+
+# Vercel serverless function handler - must be at the end after all routes
+from mangum import Mangum
+handler = Mangum(app)
