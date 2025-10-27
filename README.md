@@ -1,27 +1,18 @@
 # 🧾 Resume Agent — Quick Guide
 
-**Languages:** [English](README.md) | [简体中文](README## Manual Trigger Upsert on GitHub Actions
+**Languages:** [English](README.md) | [简体中文](README# 🧾 Resume Agent — Quick Guide
 
-The repository includes a manually triggered workflow: `.github/workflows/upsert.yml`, for executing `upsert_projects_to_vector.py` in CI.
+**Languages:** [English](README.en.md) | [简体中文](README.zh.md)
 
-Usage steps:
-
-1. Add to repository Settings → Secrets:
-   - `DATABASE_URL`
-   - `UPSTASH_VECTOR_REST_URL`
-   - `UPSTASH_VECTOR_REST_TOKEN`
-   - Optional: `GROQ_API_KEY`, `MIGRATION_KEY`
-
-2. On the GitHub repository page, open Actions → select "Upsert Projects to Vector" → click `Run workflow`.
-
-This workflow will checkout, install dependencies and run `python upsert_projects_to_vector.py` (you can later modify the workflow to accept parameters like `--dry-run` or `project_id`).s a small RAG (Retrieval-Augmented Generation) / resume assistant project (Resume Agent).
-Core concept: Convert structured project or resume information (stored in Neon/Postgres `projects` table) into vectors and save them in Upstash Vector. The frontend/Serverless retrieves relevant content during queries and uses LLM to generate data-based responses.
+This is a small RAG (Retrieval-Augmented Generation) / resume assistant project (Resume Agent).
+Core concept: Convert structured project or resume information (stored in Neon/Postgres `records` table) into vectors and save them in Upstash Vector. The frontend/Serverless retrieves relevant content during queries and uses LLM to generate data-based responses.
 
 This repository contains:
 - Data reading and migration tools: `migrate_utils.py` (can be called by CLI, CI, serverless)
 - Local upsert script: `upsert_projects_to_vector.py` (can be run manually locally or in CI)
-- Local development frontend/service: `app.py` and `frontend/` (simple chat UI for local development)
-- Serverless endpoint (deployable to Vercel): `api/upsert-projects.py` (for triggering one-time upsert)
+- **Unified FastAPI application**: `main.py` (serves both local development and Vercel deployment)
+- Frontend: `frontend/` (chat UI and admin panel)
+- Serverless endpoints (deployable to Vercel): `api/admin.py`, `api/chat.py`, `api/upsert-projects.py`
 
 ## Main Features
 

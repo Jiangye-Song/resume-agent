@@ -8,8 +8,9 @@ Core concept: Convert structured project or resume information (stored in Neon/P
 This repository contains:
 - Data reading and migration tools: `migrate_utils.py` (can be called by CLI, CI, serverless)
 - Local upsert script: `upsert_projects_to_vector.py` (can be run manually locally or in CI)
-- Local development frontend/service: `app.py` and `frontend/` (simple chat UI for local development)
-- Serverless endpoint (deployable to Vercel): `api/upsert-projects.py` (for triggering one-time upsert)
+- **Unified FastAPI application**: `main.py` (serves both local development and Vercel deployment)
+- Frontend: `frontend/` (chat UI and admin panel)
+- Serverless endpoints (deployable to Vercel): `api/admin.py`, `api/chat.py`, `api/upsert-projects.py`
 
 ## Main Features
 
@@ -73,12 +74,24 @@ python upsert_projects_to_vector.py
 
 The script will read the database and call the logic in `migrate_utils`, upload documents to Upstash, and print statistics in the console (total entries, upserted, errors).
 
-6. Start local frontend (for development)
+6. Start the unified FastAPI application (for local development)
 
 ```powershell
-python app.py
-# Then open http://127.0.0.1:5000 in your browser
+python main.py
+# Then open http://127.0.0.1:7860 in your browser for chat
+# Open http://127.0.0.1:7860/admin.html for admin panel
 ```
+
+The unified FastAPI app provides:
+- **Chat interface** at `/` - RAG-based Q&A about your resume/projects
+- **Admin panel** at `/admin.html` - Manage records (CRUD operations)
+- **API endpoints** at `/api/chat`, `/api/admin`, `/api/admin/records`
+
+**Benefits of unified architecture:**
+- ✅ Single codebase for local and production
+- ✅ No code duplication
+- ✅ Consistent behavior across environments
+- ✅ FastAPI's automatic API documentation at `/docs`
 
 ---
 
@@ -117,8 +130,16 @@ This workflow will checkout, install dependencies and run `python upsert_project
 
 ## Developer Tips
 
-- Code entry points: `migrate_utils.py` (migration logic), `upsert_projects_to_vector.py` (CLI), `api/upsert-projects.py` (serverless endpoint), `app.py` (local frontend).
-- If you need me to implement `--dry-run`, upsert by project id, or parameterized Actions input functionality to the workflow, tell me the parameters and default behavior you want, and I'll continue implementing and verifying.
+- **Main entry point**: `main.py` - Unified FastAPI application for both local and Vercel
+- **API logic**: `main.py` contains all admin and chat endpoints
+- **Migration tools**: `migrate_utils.py` (migration logic), `upsert_projects_to_vector.py` (CLI)
+- **Vercel deployment**: `api/admin.py` imports from `main.py` (no code duplication)
+- **Database schema**: Uses `records` table with fields including `id`, `type`, `title`, `summary`, `tags`, `detail_site`, `additional_url`, `start_date`, `end_date`, `priority`, `facts`
+
+**Architecture notes:**
+- The old `app.py` (Flask) is deprecated - use `main.py` (FastAPI) instead
+- All admin CRUD operations are in `main.py`
+- Vercel serverless functions import the same app from `main.py`
 
 ---
 

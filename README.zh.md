@@ -8,8 +8,9 @@
 本仓库包含：
 - 数据读取与迁移工具：`migrate_utils.py`（可被 CLI、CI、serverless 调用）
 - 本地 upsert 脚本：`upsert_projects_to_vector.py`（可本地手动运行或在 CI 中执行）
-- 本地开发用前端/服务：`app.py` 与 `frontend/`（简单聊天 UI，用于本地开发）
-- Serverless endpoint（可部署到 Vercel）：`api/upsert-projects.py`（用于触发一次性 upsert）
+- **统一的 FastAPI 应用**：`main.py`（同时服务于本地开发和 Vercel 部署）
+- 前端：`frontend/`（聊天界面和管理面板）
+- Serverless endpoints（可部署到 Vercel）：`api/admin.py`、`api/chat.py`、`api/upsert-projects.py`
 
 ## 主要功能
 
@@ -73,12 +74,24 @@ python upsert_projects_to_vector.py
 
 脚本会读取数据库并调用 `migrate_utils` 中的逻辑，上载文档到 Upstash，并在控制台打印统计信息（总条目、已 upsert、错误数）。
 
-6. 启动本地前端（开发用）
+6. 启动统一的 FastAPI 应用（本地开发）
 
 ```powershell
-python app.py
-# 然后在浏览器打开 http://127.0.0.1:5000
+python main.py
+# 然后在浏览器打开 http://127.0.0.1:7860 使用聊天功能
+# 打开 http://127.0.0.1:7860/admin.html 使用管理面板
 ```
+
+统一的 FastAPI 应用提供：
+- **聊天界面** `/` - 基于 RAG 的简历/项目问答
+- **管理面板** `/admin.html` - 管理记录（增删改查操作）
+- **API 端点** `/api/chat`、`/api/admin`、`/api/admin/records`
+
+**统一架构的优势：**
+- ✅ 本地和生产环境使用单一代码库
+- ✅ 无代码重复
+- ✅ 跨环境行为一致
+- ✅ FastAPI 自动生成 API 文档在 `/docs`
 
 ---
 
@@ -117,8 +130,16 @@ python app.py
 
 ## 开发者提示
 
-- 代码入口：`migrate_utils.py`（迁移逻辑），`upsert_projects_to_vector.py`（CLI），`api/upsert-projects.py`（serverless endpoint），`app.py`（本地前端）。
-- 若需我把 `--dry-run`、按 project id upsert 或 Actions 输入参数化的功能实现到 workflow，请告诉我你想要的参数与默认行为，我会继续实现并验证。
+- **主入口点**：`main.py` - 本地和 Vercel 的统一 FastAPI 应用
+- **API 逻辑**：`main.py` 包含所有管理和聊天端点
+- **迁移工具**：`migrate_utils.py`（迁移逻辑），`upsert_projects_to_vector.py`（CLI）
+- **Vercel 部署**：`api/admin.py` 从 `main.py` 导入（无代码重复）
+- **数据库架构**：使用 `records` 表，字段包括 `id`、`type`、`title`、`summary`、`tags`、`detail_site`、`additional_url`、`start_date`、`end_date`、`priority`、`facts`
+
+**架构说明：**
+- 旧的 `app.py`（Flask）已弃用 - 请使用 `main.py`（FastAPI）
+- 所有管理 CRUD 操作都在 `main.py` 中
+- Vercel serverless 函数从 `main.py` 导入相同的 app
 
 ---
 
