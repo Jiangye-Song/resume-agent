@@ -363,25 +363,36 @@ async def rag_query(question):
                     title = meta.get("title", "")
                     summary = meta.get("summary", "")
                     tags = meta.get("tags", [])
-                    project_site = meta.get("project-detail-site", "")
+                    detail_site = meta.get("detail_site", "")
+                    additional_urls = meta.get("additional_url", [])
                     
                     # 构建包含tags和网址的完整文本
                     tags_text = f"[Tags: {', '.join(tags)}]" if tags else ""
-                    site_text = f"[Site: {project_site}]" if project_site else ""
+                    
+                    # 构建detail site文本
+                    site_text = f"[Detail: {detail_site}]" if detail_site else ""
+                    
+                    # 构建additional URLs文本
+                    additional_text = ""
+                    if additional_urls and isinstance(additional_urls, list):
+                        url_parts = []
+                        for url_pair in additional_urls:
+                            if isinstance(url_pair, list) and len(url_pair) >= 2:
+                                label, url = url_pair[0], url_pair[1]
+                                url_parts.append(f"{label}: {url}")
+                        if url_parts:
+                            additional_text = f"[Additional: {'; '.join(url_parts)}]"
                     
                     # 组合所有信息
-                    if title and summary and tags_text and site_text:
-                        text = f"{title}. {summary} {tags_text} {site_text}"
-                    elif title and summary and tags_text:
-                        text = f"{title}. {summary} {tags_text}"
-                    elif title and summary and site_text:
-                        text = f"{title}. {summary} {site_text}"
-                    elif title and summary:
-                        text = f"{title}. {summary}"
-                    elif title and (tags_text or site_text):
-                        text = f"{title}. {tags_text} {site_text}".strip()
-                    else:
-                        text = title or summary or tags_text or site_text or "No content available"
+                    parts = [title, summary]
+                    if tags_text:
+                        parts.append(tags_text)
+                    if site_text:
+                        parts.append(site_text)
+                    if additional_text:
+                        parts.append(additional_text)
+                    
+                    text = ". ".join(filter(None, parts)) if parts else "No content available"
                     
                     # 对于优先级为0的结果，将score降低至一半
                     adjusted_score = score / 2 if priority == 0 else score
