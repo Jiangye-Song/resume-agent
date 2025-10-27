@@ -569,6 +569,10 @@
                                 <label for="newSummary">Summary</label>
                                 <textarea id="newSummary" placeholder="Detailed description of the record" rows="4"></textarea>
                             </div>
+                            <div class="form-full">
+                                <label for="newFacts">Facts</label>
+                                <textarea id="newFacts" placeholder="One fact per line (will be stored as metadata, not used for embedding)" rows="4"></textarea>
+                            </div>
                         </div>
                     </div>
 
@@ -691,6 +695,10 @@
                         <div class="form-full">
                             <label for="editSummary">Summary</label>
                             <textarea id="editSummary" rows="8"></textarea>
+                        </div>
+                        <div class="form-full">
+                            <label for="editFacts">Facts</label>
+                            <textarea id="editFacts" placeholder="One fact per line (will be stored as metadata, not used for embedding)" rows="6"></textarea>
                         </div>
                     </div>
                 </div>
@@ -846,6 +854,7 @@
             document.getElementById('newId').value = '';
             document.getElementById('newTitle').value = '';
             document.getElementById('newSummary').value = '';
+            document.getElementById('newFacts').value = '';
             document.getElementById('newTags').value = '';
             document.getElementById('newDetailSite').value = '';
             document.getElementById('newStartDate').value = '';
@@ -884,6 +893,7 @@
                 type: document.getElementById('newType').value,
                 title: document.getElementById('newTitle').value.trim(),
                 summary: document.getElementById('newSummary').value.trim(),
+                facts: document.getElementById('newFacts').value.trim(),
                 tags: document.getElementById('newTags').value.split(',').map(t => t.trim()).filter(t => t),
                 detail_site: document.getElementById('newDetailSite').value.trim(),
                 additional_url: additionalUrls,
@@ -1048,6 +1058,7 @@
                 document.getElementById('editType').value = record.type;
                 document.getElementById('editTitle').value = record.title || '';
                 document.getElementById('editSummary').value = record.summary || '';
+                document.getElementById('editFacts').value = record.facts ? record.facts.join('\n') : '';
                 document.getElementById('editTags').value = record.tags ? record.tags.join(', ') : '';
                 document.getElementById('editDetailSite').value = record.detail_site || '';
                 document.getElementById('editStartDate').value = record.start_date || '';
@@ -1116,6 +1127,7 @@
                 type: document.getElementById('editType').value,
                 title: document.getElementById('editTitle').value.trim(),
                 summary: document.getElementById('editSummary').value.trim(),
+                facts: document.getElementById('editFacts').value.trim(),
                 tags: document.getElementById('editTags').value.split(',').map(t => t.trim()).filter(t => t),
                 detail_site: document.getElementById('editDetailSite').value.trim(),
                 additional_url: additionalUrls,
