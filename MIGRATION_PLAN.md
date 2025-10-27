@@ -901,7 +901,7 @@ VECTOR_DB_TYPE=upstash
 # LLM
 GROQ_API_KEY=xxx
 LLM_PROVIDER=groq
-GROQ_MODEL=deepseek-r1-distill-llama-70b
+GROQ_MODEL=openai/gpt-oss-20b
 
 # Admin Panel (new)
 ADMIN_API_KEY=your-secret-admin-key-here

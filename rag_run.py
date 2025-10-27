@@ -24,7 +24,7 @@ DEFAULT_SYSTEM_PROMPT = '''You are a helpful assistant, you should notify the de
 # Constants
 VECTOR_DB_TYPE = os.getenv("VECTOR_DB_TYPE")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER")
-LLM_MODEL = os.getenv("GROQ_MODEL", "deepseek-r1-distill-llama-70b")
+LLM_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 UPSTASH_VECTOR_REST_URL = os.getenv("UPSTASH_VECTOR_REST_URL")
 UPSTASH_VECTOR_REST_TOKEN = os.getenv("UPSTASH_VECTOR_REST_TOKEN")
