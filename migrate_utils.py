@@ -41,10 +41,10 @@ async def migrate_records_async():
 
     conn = await asyncpg.connect(DATABASE_URL)
     try:
-        # Read from records table with new schema
+        # Read from records table with new schema including facts
         rows = await conn.fetch('''
             SELECT id, type, title, summary, tags, detail_site, additional_url, 
-                   start_date, end_date, priority
+                   start_date, end_date, priority, facts
             FROM records 
             ORDER BY priority DESC, type, id
         ''')
@@ -61,7 +61,8 @@ async def migrate_records_async():
                 'additional_url': r['additional_url'] if r['additional_url'] else [],
                 'start_date': r['start_date'].isoformat() if r['start_date'] else None,
                 'end_date': r['end_date'].isoformat() if r['end_date'] else None,
-                'priority': r['priority']
+                'priority': r['priority'],
+                'facts': list(r['facts']) if r['facts'] else []
             }
             records.append(record)
     finally:
@@ -86,23 +87,28 @@ async def migrate_records_async():
             if record.get('summary'):
                 enriched_parts.append(record['summary'])
             
-            # 3. Tags (keywords for semantic search)
+            # 3. Facts (key information points)
+            if record.get('facts'):
+                facts_str = '. '.join(record['facts'])
+                enriched_parts.append(f"Key facts: {facts_str}")
+            
+            # 4. Tags (keywords for semantic search)
             if record.get('tags'):
                 tags_str = ' '.join(record['tags'])
                 enriched_parts.append(f"Technologies: {tags_str}")
             
-            # 4. Detail site URL
+            # 5. Detail site URL
             if record.get('detail_site'):
                 enriched_parts.append(f"Website: {record['detail_site']}")
             
-            # 5. Additional URLs with labels
+            # 6. Additional URLs with labels
             if record.get('additional_url'):
                 for url_pair in record['additional_url']:
                     if len(url_pair) == 2:
                         label, url = url_pair
                         enriched_parts.append(f"{label.capitalize()}: {url}")
             
-            # 6. Temporal information
+            # 7. Temporal information
             date_parts = []
             if record.get('start_date'):
                 date_parts.append(f"from {record['start_date']}")
@@ -111,19 +117,20 @@ async def migrate_records_async():
             if date_parts:
                 enriched_parts.append(f"Duration {' '.join(date_parts)}")
             
-            # 7. Type/Category
+            # 8. Type/Category
             record_type = record.get('type', 'project')
             enriched_parts.append(f"Category: {record_type}")
             
             # Join all parts into enriched text
             enriched_text = ". ".join(enriched_parts) + "."
             
-            # Build metadata for storage
+            # Build metadata for storage including facts
             metadata = {
                 'id': record['id'],
                 'type': record_type,
                 'title': record.get('title', 'untitled'),
                 'summary': record.get('summary', ''),
+                'facts': record.get('facts', []),
                 'tags': record.get('tags', []),
                 'detail_site': record.get('detail_site', ''),
                 'additional_url': record.get('additional_url', []),

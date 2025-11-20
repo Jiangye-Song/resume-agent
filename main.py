@@ -1,12 +1,41 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 import os
 import hashlib
 import asyncpg
 from datetime import date, datetime
 
-app = FastAPI()
+# Database connection pool
+db_pool = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage database connection pool lifecycle."""
+    global db_pool
+    DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
+    if DATABASE_URL:
+        try:
+            db_pool = await asyncpg.create_pool(
+                DATABASE_URL,
+                min_size=2,
+                max_size=10,
+                command_timeout=60
+            )
+            print("Database connection pool initialized")
+        except Exception as e:
+            print(f"Failed to create database pool: {e}")
+    
+    yield
+    
+    if db_pool:
+        await db_pool.close()
+        print("Database connection pool closed")
+
+
+app = FastAPI(lifespan=lifespan)
 
 # Import rag_query from rag_run with fallback
 try:
@@ -45,13 +74,12 @@ def parse_date(date_str):
 
 async def verify_password(password: str) -> bool:
     """Verify password against stored hash in config table."""
-    DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
-    if not DATABASE_URL:
+    global db_pool
+    if not db_pool:
         return False
     
     try:
-        conn = await asyncpg.connect(DATABASE_URL)
-        try:
+        async with db_pool.acquire() as conn:
             row = await conn.fetchrow(
                 "SELECT value FROM config WHERE key = 'panel_passcode'"
             )
@@ -61,8 +89,6 @@ async def verify_password(password: str) -> bool:
             stored_hash = row['value']
             input_hash = hash_password(password)
             return stored_hash == input_hash
-        finally:
-            await conn.close()
     except Exception as e:
         print(f"Password verification error: {e}")
         return False
@@ -116,11 +142,10 @@ async def list_or_create_records(request: Request):
     if action == 'list':
         # List all records
         try:
-            conn = await asyncpg.connect(DATABASE_URL)
-            try:
+            async with db_pool.acquire() as conn:
+                # Only select columns needed for the table display (not summary, detail_site, additional_url, facts)
                 rows = await conn.fetch('''
-                    SELECT id, type, title, summary, tags, detail_site, additional_url,
-                           start_date, end_date, priority, facts
+                    SELECT id, type, title, tags, start_date, end_date, priority
                     FROM records
                     ORDER BY priority DESC, type, id
                 ''')
@@ -131,19 +156,13 @@ async def list_or_create_records(request: Request):
                         'id': r['id'],
                         'type': r['type'],
                         'title': r['title'],
-                        'summary': r['summary'],
                         'tags': list(r['tags']) if r['tags'] else [],
-                        'detail_site': r['detail_site'],
-                        'additional_url': r['additional_url'] if r['additional_url'] else [],
                         'start_date': r['start_date'].isoformat() if r['start_date'] else None,
                         'end_date': r['end_date'].isoformat() if r['end_date'] else None,
-                        'priority': r['priority'],
-                        'facts': list(r['facts']) if r['facts'] else []
+                        'priority': r['priority']
                     })
                 
                 return JSONResponse({'status': 'ok', 'records': records, 'count': len(records)})
-            finally:
-                await conn.close()
         except Exception as e:
             return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
     
@@ -158,8 +177,7 @@ async def list_or_create_records(request: Request):
             }, status_code=400)
         
         try:
-            conn = await asyncpg.connect(DATABASE_URL)
-            try:
+            async with db_pool.acquire() as conn:
                 # Parse additional_url if it's a string
                 additional_url = record.get('additional_url', [])
                 if isinstance(additional_url, str):
@@ -197,8 +215,6 @@ async def list_or_create_records(request: Request):
                 )
                 
                 return JSONResponse({'status': 'ok', 'message': 'Record created successfully', 'id': record['id']})
-            finally:
-                await conn.close()
         except Exception as e:
             import traceback
             error_detail = traceback.format_exc()
@@ -221,8 +237,7 @@ async def get_record(record_id: str, password: str = ''):
         return JSONResponse({'status': 'error', 'message': 'Database not configured'}, status_code=500)
     
     try:
-        conn = await asyncpg.connect(DATABASE_URL)
-        try:
+        async with db_pool.acquire() as conn:
             row = await conn.fetchrow('''
                 SELECT id, type, title, summary, tags, detail_site, additional_url,
                        start_date, end_date, priority, facts
@@ -248,8 +263,6 @@ async def get_record(record_id: str, password: str = ''):
             }
             
             return JSONResponse({'status': 'ok', 'record': record})
-        finally:
-            await conn.close()
     except Exception as e:
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
 
@@ -276,8 +289,7 @@ async def update_record(record_id: str, request: Request):
         }, status_code=400)
     
     try:
-        conn = await asyncpg.connect(DATABASE_URL)
-        try:
+        async with db_pool.acquire() as conn:
             # Parse additional_url if it's a string
             additional_url = record.get('additional_url', [])
             if isinstance(additional_url, str):
@@ -317,8 +329,6 @@ async def update_record(record_id: str, request: Request):
             )
             
             return JSONResponse({'status': 'ok', 'message': 'Record updated successfully', 'id': record_id})
-        finally:
-            await conn.close()
     except Exception as e:
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
 
@@ -337,12 +347,9 @@ async def delete_record(record_id: str, request: Request):
         return JSONResponse({'status': 'error', 'message': 'Database not configured'}, status_code=500)
     
     try:
-        conn = await asyncpg.connect(DATABASE_URL)
-        try:
+        async with db_pool.acquire() as conn:
             await conn.execute('DELETE FROM records WHERE id = $1', record_id)
             return JSONResponse({'status': 'ok', 'message': 'Record deleted successfully', 'id': record_id})
-        finally:
-            await conn.close()
     except Exception as e:
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
 
@@ -365,6 +372,71 @@ async def upsert_all_records(request: Request):
             'stats': stats
         })
     except Exception as e:
+        return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+
+
+@app.post('/api/admin/generate-facts')
+async def generate_facts(request: Request):
+    """Generate a list of facts from a summary using LLM."""
+    body = await request.json()
+    password = body.get('password', '')
+    summary = body.get('summary', '')
+    
+    if not await verify_password(password):
+        return JSONResponse({'status': 'error', 'message': 'Invalid password'}, status_code=401)
+    
+    if not summary:
+        return JSONResponse({'status': 'error', 'message': 'Summary is required'}, status_code=400)
+    
+    try:
+        # Import Groq client
+        from groq import Groq
+        GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+        
+        if not GROQ_API_KEY:
+            return JSONResponse({'status': 'error', 'message': 'LLM API not configured'}, status_code=500)
+        
+        groq_client = Groq(api_key=GROQ_API_KEY)
+        
+        # Create prompt for facts generation
+        prompt = f"""Convert the following summary into a concise list of factual bullet points. 
+Extract only the key facts, achievements, and technical details. 
+Each fact should be one line, clear and specific.
+Return only the bullet points, one per line, without numbering or bullet symbols.
+
+Summary:
+{summary}
+
+Facts (one per line):"""
+        
+        # Call LLM
+        response = groq_client.chat.completions.create(
+            model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that extracts key facts from text summaries. Be concise and specific."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=500
+        )
+        
+        # Extract facts from response
+        facts_text = response.choices[0].message.content.strip()
+        
+        # Split into lines and clean up
+        facts = [line.strip() for line in facts_text.split('\n') if line.strip() and not line.strip().startswith('#')]
+        
+        # Remove common bullet point symbols if present
+        facts = [fact.lstrip('•-*→▸▹►‣⁃').strip() for fact in facts]
+        
+        return JSONResponse({
+            'status': 'ok',
+            'facts': facts
+        })
+    except Exception as e:
+        import traceback
+        print(f"Error generating facts: {e}")
+        print(traceback.format_exc())
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
 
 

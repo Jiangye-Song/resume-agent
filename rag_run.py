@@ -359,12 +359,19 @@ async def rag_query(question):
                 
                 if isinstance(meta, dict):
                     priority = meta.get("priority", 3)
-                    # 从metadata中构建文本内容，包含tags和网址信息
+                    # 从metadata中构建文本内容，包含facts、tags和网址信息
                     title = meta.get("title", "")
                     summary = meta.get("summary", "")
+                    facts = meta.get("facts", [])
                     tags = meta.get("tags", [])
                     detail_site = meta.get("detail_site", "")
                     additional_urls = meta.get("additional_url", [])
+                    
+                    # 构建facts文本
+                    facts_text = ""
+                    if facts and isinstance(facts, list) and len(facts) > 0:
+                        facts_list = "\n  • " + "\n  • ".join(facts)
+                        facts_text = f"[Key Facts:{facts_list}]"
                     
                     # 构建包含tags和网址的完整文本
                     tags_text = f"[Tags: {', '.join(tags)}]" if tags else ""
@@ -383,8 +390,10 @@ async def rag_query(question):
                         if url_parts:
                             additional_text = f"[Additional: {'; '.join(url_parts)}]"
                     
-                    # 组合所有信息
-                    parts = [title, summary]
+                    # 组合信息
+                    parts = [title]
+                    if facts_text:
+                        parts.append(facts_text)
                     if tags_text:
                         parts.append(tags_text)
                     if site_text:

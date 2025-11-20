@@ -572,6 +572,9 @@
                             <div class="form-full">
                                 <label for="newFacts">Facts</label>
                                 <textarea id="newFacts" placeholder="One fact per line (will be stored as metadata, not used for embedding)" rows="4"></textarea>
+                                <button type="button" class="secondary" onclick="generateFactsFromSummary('new')" style="margin-top: 8px;">
+                                    <span id="generateNewFactsBtn">✨ Generate Facts from Summary</span>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -699,6 +702,9 @@
                         <div class="form-full">
                             <label for="editFacts">Facts</label>
                             <textarea id="editFacts" placeholder="One fact per line (will be stored as metadata, not used for embedding)" rows="6"></textarea>
+                            <button type="button" class="secondary" onclick="generateFactsFromSummary('edit')" style="margin-top: 8px;">
+                                <span id="generateEditFactsBtn">✨ Generate Facts from Summary</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -937,6 +943,47 @@
                 createBtn.disabled = false;
                 createBtn.innerHTML = originalText;
                 showMessage('Error creating record: ' + error.message, 'error');
+            }
+        }
+
+        async function generateFactsFromSummary(formType) {
+            const summaryId = formType === 'new' ? 'newSummary' : 'editSummary';
+            const factsId = formType === 'new' ? 'newFacts' : 'editFacts';
+            const btnId = formType === 'new' ? 'generateNewFactsBtn' : 'generateEditFactsBtn';
+            
+            const summary = document.getElementById(summaryId).value.trim();
+            
+            if (!summary) {
+                showMessage('Please enter a summary first', 'error');
+                return;
+            }
+            
+            const btnSpan = document.getElementById(btnId);
+            const originalText = btnSpan.innerHTML;
+            btnSpan.innerHTML = '⏳ Generating...';
+            
+            try {
+                const response = await fetch('/api/admin/generate-facts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        password: sessionPassword,
+                        summary: summary
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    document.getElementById(factsId).value = data.facts.join('\n');
+                    showMessage('Facts generated successfully!', 'success');
+                } else {
+                    showMessage(data.message || 'Failed to generate facts', 'error');
+                }
+            } catch (error) {
+                showMessage('Error generating facts: ' + error.message, 'error');
+            } finally {
+                btnSpan.innerHTML = originalText;
             }
         }
 
