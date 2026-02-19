@@ -10,11 +10,14 @@ from datetime import date, datetime
 # Database connection pool
 db_pool = None
 
+# AI Agent
+agent = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Manage database connection pool lifecycle."""
-    global db_pool
+    """Manage database connection pool and AI agent lifecycle."""
+    global db_pool, agent
     DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URL_UNPOOLED')
     if DATABASE_URL:
         try:
@@ -27,6 +30,29 @@ async def lifespan(app: FastAPI):
             print("Database connection pool initialized")
         except Exception as e:
             print(f"Failed to create database pool: {e}")
+    
+    # Initialize AI Agent with tools
+    try:
+        from groq import Groq
+        from tools import RAGSearchTool, DateQueryTool, FilterTool, DetailTool, StatsTool
+        from agent import ResumeAgent
+        
+        tools = [
+            RAGSearchTool(db_pool),
+            DateQueryTool(db_pool),
+            FilterTool(db_pool),
+            DetailTool(db_pool),
+            StatsTool(db_pool)
+        ]
+        
+        groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        agent = ResumeAgent(tools=tools, llm_client=groq_client)
+        
+        print(f"✅ AI Agent initialized with {len(tools)} tools")
+    except Exception as e:
+        print(f"⚠️ AI Agent initialization failed: {e}")
+        print("   Agent features will be disabled. Legacy RAG will be used.")
+        agent = None
     
     yield
     
@@ -97,16 +123,41 @@ async def verify_password(password: str) -> bool:
 # Chat endpoint
 @app.post('/api/chat')
 async def chat(request: Request):
-    """Chat endpoint using RAG."""
+    """
+    Chat endpoint with AI Agent support.
+    
+    Request body:
+    - question (required): User's question
+    - use_agent (optional): Boolean flag to use AI Agent (default: True)
+    
+    If use_agent=True and agent is available, uses multi-tool AI agent.
+    Otherwise, falls back to legacy RAG system.
+    """
     body = await request.json()
     question = body.get('question', '')
+    use_agent = body.get('use_agent', True)  # Default to agent mode
     
     if not question:
         return JSONResponse({'error': 'question is required'}, status_code=400)
     
     try:
-        answer = await rag_query(question)
-        return JSONResponse({'answer': answer})
+        # Use AI Agent if available and requested
+        if use_agent and agent:
+            print(f"🤖 Using AI Agent for query: {question[:50]}...")
+            answer = await agent.run(question)
+            return JSONResponse({
+                'answer': answer,
+                'mode': 'agent',
+                'tools_used': agent.tool_calls_history
+            })
+        else:
+            # Fall back to legacy RAG
+            print(f"📚 Using legacy RAG for query: {question[:50]}...")
+            answer = await rag_query(question)
+            return JSONResponse({
+                'answer': answer,
+                'mode': 'rag'
+            })
     except Exception as e:
         return JSONResponse({'error': str(e)}, status_code=500)
 
